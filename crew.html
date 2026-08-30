@@ -96,6 +96,14 @@ pre.txt{white-space:pre-wrap;font:inherit;margin:0;line-height:1.5}
   </div>
 
   <!-- LINK REKRUTACYJNY -->
+  <div id="home" class="hidden">
+    <h1 id="hHello" style="margin:14px 0 4px">Moje eventy</h1>
+    <p class="note" id="hSub" style="margin-top:0">Twoje najbliższe wyjazdy z PMB. Kliknij event, żeby zobaczyć szczegóły i agendę.</p>
+    <div id="hList"></div>
+    <button class="btn" id="hIcs" style="margin-top:14px">📅 Dodaj do kalendarza (.ics)</button>
+    <p class="note" style="margin-top:8px">Plik .ics otwórz na telefonie — eventy dodadzą się do kalendarza Google/Apple.</p>
+  </div>
+
   <div id="recruit" class="hidden">
     <div class="card">
       <h1>Dołącz do ekipy PMB</h1>
@@ -269,7 +277,7 @@ const SUPABASE_KEY = 'sb_publishable__bPrQF9K35vs8RbLdWBRXQ_VBVj2esQ';
 
 const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
-const token = qs.get('t'); const code = qs.get('e');
+const token = qs.get('t'); const code = qs.get('e'); const mtoken = qs.get('m');
 let D = null;
 
 async function rpc(fn, args){
@@ -466,7 +474,42 @@ async function joinFlow(){
     catch(e){ $('jBtn').disabled=false; $('jErr').classList.remove('hidden'); $('jErr').textContent = /closed/.test(e.message)?'Zapisy zamknięte.':/bad phone/.test(e.message)?'Ten numer wygląda źle — sprawdź.':'Nie udało się. Spróbuj jeszcze raz.'; }
   };
 }
+async function homeFlow(){
+  let H=null; try{ H=await rpc('crew_home',{p_mtoken:mtoken}); }catch(e){}
+  $('loading').classList.add('hidden');
+  if(!H){ $('invalid').classList.remove('hidden'); return; }
+  $('statusPill').textContent='Moje eventy'; $('statusPill').className='pill';
+  $('home').classList.remove('hidden');
+  if(H.first_name) $('hHello').textContent='Cześć '+H.first_name+'! Twoje eventy';
+  const evs=H.events||[]; const today=new Date().toISOString().slice(0,10);
+  const up=evs.filter(e=>e.event_date>=today), past=evs.filter(e=>e.event_date<today).reverse();
+  const stat=s=>s==='zaakceptowany'?'<span class="pill ok">wchodzisz</span>':s==='odrzucony'?'<span class="pill bad">odrzucone</span>':'<span class="pill warn">do potwierdzenia</span>';
+  const card=e=>`<a class="card" style="display:block;text-decoration:none;color:inherit;margin-bottom:10px" href="?t=${encodeURIComponent(e.token)}">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+        <div><b style="font-size:16px">${esc(e.name)}</b>
+          <div class="note" style="margin:4px 0 0">${fmtDate(e.event_date)} · ${esc(e.start_time||'')}${e.end_time?'–'+esc(e.end_time):''}</div>
+          <div class="note" style="margin:2px 0 0">${esc([e.venue,e.address].filter(Boolean).join(', '))}</div>
+          ${e.meeting_time?`<div class="note" style="margin:2px 0 0">Zbiórka: ${esc(e.meeting_time)}</div>`:''}
+        </div>
+        <div>${stat(e.status)}</div>
+      </div></a>`;
+  $('hList').innerHTML=(up.length?up.map(card).join(''):'<p class="note">Na razie brak nadchodzących eventów — Tomek się odezwie.</p>')
+    +(past.length?'<p class="note" style="margin:16px 0 8px">Ostatnie eventy:</p>'+past.map(card).join(''):'');
+  $('hIcs').onclick=()=>{
+    const list=up.filter(e=>e.status==='zaakceptowany'); if(!list.length){ alert('Brak zaakceptowanych nadchodzących eventów.'); return; }
+    const dt=(d,t)=>{ const p=(t||'12:00').split(':'); return d.replace(/-/g,'')+'T'+String(p[0]).padStart(2,'0')+String(p[1]||'00').padStart(2,'0')+'00'; };
+    const vev=e=>{ let endDate=e.event_date, end=e.end_time||e.start_time||'23:59';
+      if(e.end_time&&e.start_time&&e.end_time<=e.start_time){ const x=new Date(e.event_date+'T12:00:00'); x.setDate(x.getDate()+1); endDate=x.toISOString().slice(0,10); }
+      const cl=s=>String(s||'').replace(/[\n;,]/g,' ');
+      return ['BEGIN:VEVENT','UID:pmb-'+e.token+'@pimpmybar.pl','DTSTART;TZID=Europe/Warsaw:'+dt(e.event_date,e.start_time),'DTEND;TZID=Europe/Warsaw:'+dt(endDate,end),
+        'SUMMARY:PMB — '+cl(e.name),'LOCATION:'+cl([e.venue,e.address].filter(Boolean).join(' ')),
+        'DESCRIPTION:Szczegóły i agenda: '+location.origin+location.pathname+'?t='+e.token,'END:VEVENT'].join('\r\n'); };
+    const ics='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//PMB Crew//PL\r\nCALSCALE:GREGORIAN\r\n'+list.map(vev).join('\r\n')+'\r\nEND:VCALENDAR';
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar;charset=utf-8'})); a.download='pmb-eventy.ics'; a.click();
+  };
+}
 (async()=>{
+  if(!token && mtoken){ return homeFlow(); }
   if(!token && qs.has('r')){ return recruitFlow(); }
   if(!token && code){ return joinFlow(); }
   if(!token){ $('loading').classList.add('hidden'); $('invalid').classList.remove('hidden'); return; }

@@ -276,6 +276,8 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
           <div><label>Prawo jazdy</label><select id="pe_lic"><option value="">—</option><option value="true">tak</option><option value="false">nie</option></select></div>
           <div><label>Swoje auto</label><select id="pe_car"><option value="">—</option><option value="true">tak</option><option value="false">nie</option></select></div>
         </div>
+        <label>Stały link barmana — „Moje eventy” (kalendarz)</label>
+        <div style="display:flex;gap:8px;align-items:center"><input id="pe_mylink" readonly style="flex:1"><button class="btn sm" id="pe_mycopy">Kopiuj</button></div>
         <label>Notatki (tylko dla Ciebie)</label><textarea id="pe_notes"></textarea>
         <div class="check"><input type="checkbox" id="pe_active"><label style="margin:0">Aktywny</label></div>
         <div style="display:flex;gap:8px;margin-top:14px"><button class="btn primary" id="pe_save">Zapisz</button><span class="muted" id="pe_msg"></span></div>
@@ -590,6 +592,8 @@ function editPerson(id){
   curPerson=people.find(p=>p.id===id); const p=curPerson; $('personCard').classList.remove('hidden');
   $('pe_first').value=p.first_name||''; $('pe_last').value=p.last_name||''; $('pe_phone').value=p.phone||''; $('pe_email').value=p.email||''; $('pe_city').value=p.city||'';
   $('pe_size').value=p.shirt_size||''; $('pe_role').value=p.default_role||'barman'; $('pe_rating').value=p.rating??''; $('pe_exp').value=p.experience||''; $('pe_lic').value=p.driving_license==null?'':String(p.driving_license); $('pe_car').value=p.has_car==null?'':String(p.has_car); $('pe_notes').value=p.notes||''; $('pe_active').checked=p.active!==false; $('pe_status').value=p.status||'nowy'; $('pe_terms').value=p.terms_accepted_at?new Date(p.terms_accepted_at).toLocaleString('pl-PL'):'—';
+  $('pe_mylink').value=p.my_token?`${crewUrl()}?m=${p.my_token}`:'uruchom update15.sql w Supabase';
+  $('pe_mycopy').onclick=()=>{ if(p.my_token){ navigator.clipboard.writeText($('pe_mylink').value); toast('Link skopiowany'); } };
   $('personCard').scrollIntoView({behavior:'smooth'});
 }
 $('pe_save').onclick=async()=>{
