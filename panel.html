@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0d0d0f;--card:#17171b;--card2:#1f1f25;--line:#2a2a32;--txt:#f2f0ea;--muted:#9a9aa6;--acc:#e8b04b;--ok:#4cc38a;--bad:#e5534b;--warn:#e8b04b;--r:14px}
+html.light{--bg:#f4f2ec;--card:#ffffff;--card2:#edeae1;--line:#dcd8cc;--txt:#1d1c18;--muted:#6d6c64;--acc:#b07a14;--ok:#1e8a5a;--bad:#c23b34;--warn:#b07a14}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,sans-serif;font-size:14px}
 .top{display:flex;align-items:center;gap:18px;padding:12px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
@@ -64,7 +65,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
     <div class="logo">PIMP MY BAR <span>CREW</span></div>
     <div class="tabs"><button data-t="events" class="on">Eventy</button><button data-t="people">Ludzie</button><button data-t="shop">Zakupy</button><button data-t="settings">Ustawienia</button></div>
     <div class="sp"></div>
-    <button class="btn sm" id="logout">Wyloguj</button>
+    <button class="btn sm" id="themeBtn" title="Jasny / ciemny motyw">◐</button> <button class="btn sm" id="logout">Wyloguj</button>
   </div>
   <div class="main">
 
@@ -80,7 +81,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
         <div id="evPane" class="hidden">
           <div class="card">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-              <div><h1 id="e_title" style="margin-bottom:2px"></h1><div class="muted" id="e_sub"></div><div style="margin-top:6px;display:flex;gap:6px"><a class="btn sm primary" id="e_agendaBtn" target="_blank">Agenda PMB (podgląd / druk)</a><a class="btn sm hidden" id="e_contractBtn" target="_blank" rel="noopener">Otwórz umowę</a></div></div>
+              <div><h1 id="e_title" style="margin-bottom:2px"></h1><div class="muted" id="e_sub"></div><div style="margin-top:6px;display:flex;gap:6px"><a class="btn sm primary" id="e_agendaBtn" target="_blank">Agenda PMB (podgląd / druk)</a><a class="btn sm" id="e_menuBtn" target="_blank">Menu do druku</a><a class="btn sm hidden" id="e_contractBtn" target="_blank" rel="noopener">Otwórz umowę</a></div></div>
               <div class="tabs"><button data-s="crew" class="on">Skład</button><button data-s="agenda">Agenda</button><button data-s="pack">Pakowanie</button><button data-s="edit">Dane eventu</button></div>
             </div>
           </div>
@@ -290,11 +291,17 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
           <button class="btn primary" id="s_run">Policz</button>
           <label class="check" style="margin:0"><input type="checkbox" id="s_onlyOrder" checked> tylko do zamówienia</label>
           <div class="sp"></div>
-          <button class="btn" id="s_copy">Kopiuj zamówienie</button><button class="btn" id="s_csv">Kopiuj jako CSV</button>
+          <button class="btn" id="s_copy">Kopiuj zamówienie</button><button class="btn" id="s_csv">Kopiuj jako CSV</button> <button class="btn" id="s_snap">Zapisz remanent</button><button class="btn danger" id="s_clear">Wyczyść stan</button>
         </div>
         <p class="muted" style="margin:10px 0 0">Suma ilości z agend eventów w zakresie (statusy wstępny + potwierdzony), minus stan magazynu = do zamówienia. Stan edytujesz bezpośrednio w tabeli (remanent).</p>
         <div id="s_events" class="muted" style="margin-top:6px"></div>
         <div style="overflow-x:auto;margin-top:10px"><div id="s_table"></div></div>
+      </div>
+      <div class="card">
+        <h2>Remanenty — historia</h2>
+        <p class="muted" style="margin-top:0">„Zapisz remanent” robi zdjęcie aktualnego stanu magazynu. Po evencie wpisz, co wróciło, zapisz nowy remanent i porównasz — widać, co zeszło i co zostało.</p>
+        <div id="s_snaps" class="muted">—</div>
+        <div style="overflow-x:auto;margin-top:10px"><div id="s_snapView"></div></div>
       </div>
     </div>
 
@@ -408,7 +415,7 @@ async function openEvent(id){
   $('h_type').value=cur.service_type||''; $('h_paytype').value=cur.payment_type||''; $('h_modules').value=cur.modules||''; $('h_contract').value=cur.contract_url||'';
   $('h_orgphone').value=cur.organizer_phone||''; $('h_km').value=cur.distance_km??''; $('h_tolls').value=cur.tolls||''; $('h_travel').value=cur.travel_time||''; $('h_depart').value=cur.departure_time||''; $('h_welcome').value=cur.welcome_drinks||'';
   $('e_contractBtn').classList.toggle('hidden', !cur.contract_url); $('e_contractBtn').href=cur.contract_url||'#';
-  $('e_agendaBtn').href='agenda.html?id='+cur.id;
+  $('e_agendaBtn').href='agenda.html?id='+cur.id; $('e_menuBtn').href='menu.html?id='+cur.id;
   $('g_transport').value=cur.transport||''; $('g_schedule').value=cur.schedule||''; $('g_vehicle').value=cur.vehicle||''; $('g_branding').value=cur.branding||''; $('g_menu').value=cur.menu||''; $('g_notes').value=cur.notes||''; $('g_pub').checked=!!cur.agenda_published;
   $('a_result').classList.add('hidden');
   await Promise.all([loadAsgs(), loadUpdates()]);
@@ -596,7 +603,7 @@ function isoMonday(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDat
 async function loadShop(){
   if(!CAT.length) await loadCatalog();
   if(!$('s_from').value){ const m=isoMonday(new Date()); $('s_from').value=m; const t=new Date(m); t.setDate(t.getDate()+13); $('s_to').value=t.toISOString().slice(0,10); }
-  await runShop();
+  await runShop(); loadSnaps();
 }
 async function runShop(){
   const f=$('s_from').value, t=$('s_to').value; if(!f||!t) return;
@@ -619,6 +626,43 @@ function renderShop(){
 $('s_run').onclick=runShop; $('s_onlyOrder').onchange=renderShop;
 $('s_copy').onclick=()=>{ const lines=[]; let cat=null; SHOP.rows.filter(r=>r.order>0).forEach(r=>{ if(r.c.category!==cat){cat=r.c.category; lines.push('\n'+cat);} lines.push(`${r.c.name} — ${fmtN(r.order)} ${r.c.unit||''}`); }); navigator.clipboard.writeText(`ZAMÓWIENIE PMB ${$('s_from').value} – ${$('s_to').value}${lines.join('\n')}`); toast('Skopiowano'); };
 $('s_csv').onclick=()=>{ const evs=SHOP.events; const head=['Kategoria','Pozycja','Jedn.',...evs.map(e=>e.name),'Razem','Stan','Do zamówienia']; const rows=SHOP.rows.map(r=>[r.c.category,r.c.name,r.c.unit||'',...r.per,r.need,r.stock,r.order]); navigator.clipboard.writeText([head,...rows].map(r=>r.map(x=>`"${String(x??'').replace(/"/g,'""')}"`).join(';')).join('\n')); toast('CSV skopiowany'); };
+
+/* ---------- REMANENTY ---------- */
+async function loadSnaps(){
+  try{
+    const snaps = await api('GET','remanenty?select=id,created_at,note&order=created_at.desc&limit=40');
+    $('s_snaps').innerHTML = snaps.length ? snaps.map(sn=>`<button class="btn sm" data-snap="${sn.id}" style="margin:0 6px 6px 0">${new Date(sn.created_at).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}${sn.note?' · '+esc(sn.note):''}</button>`).join('') : 'Brak zapisanych remanentów. Kliknij „Zapisz remanent”, żeby zrobić pierwszy.';
+    $('s_snaps').querySelectorAll('[data-snap]').forEach(b=>b.onclick=()=>showSnap(b.dataset.snap));
+  }catch(e){ $('s_snaps').textContent='Uruchom update14.sql w Supabase, żeby włączyć historię remanentów.'; }
+}
+async function showSnap(id){
+  const [sn] = await api('GET',`remanenty?id=eq.${id}&select=*`);
+  const cur={}; CAT.forEach(c=>cur[c.id]=c.stock==null?null:Number(c.stock));
+  let cat=null, html=`<p class="muted" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">Remanent z ${new Date(sn.created_at).toLocaleString('pl-PL')}${sn.note?' — '+esc(sn.note):''} · porównanie z aktualnym stanem <button class="btn sm danger" id="s_snapDel">Usuń</button></p><table><thead><tr><th>Pozycja</th><th style="width:60px">Jedn.</th><th class="right" style="width:90px">Wtedy</th><th class="right" style="width:90px">Teraz</th><th class="right" style="width:90px">Różnica</th></tr></thead><tbody>`;
+  (sn.items||[]).forEach(it=>{ const then=it.stock==null?null:Number(it.stock); const now=cur[it.id]??null; if(then==null&&now==null) return;
+    if(it.category!==cat){cat=it.category; html+=`<tr><td colspan="5" style="color:var(--acc);font-weight:700;padding-top:10px">${esc(cat)}</td></tr>`;}
+    const d=(now??0)-(then??0);
+    html+=`<tr><td>${esc(it.name)}</td><td class="muted">${esc(it.unit||'')}</td><td class="right muted">${then==null?'—':fmtN(then)}</td><td class="right">${now==null?'—':fmtN(now)}</td><td class="right" style="font-weight:600;color:${d>0?'var(--ok)':d<0?'var(--bad)':'var(--muted)'}">${d>0?'+':''}${d===0?'0':fmtN(d)}</td></tr>`; });
+  html+='</tbody></table>';
+  $('s_snapView').innerHTML=html;
+  $('s_snapDel').onclick=async()=>{ if(!confirm('Usunąć ten remanent z historii?')) return; await api('DELETE',`remanenty?id=eq.${id}`,null,'return=minimal'); $('s_snapView').innerHTML=''; loadSnaps(); toast('Usunięto'); };
+}
+$('s_snap').onclick=async()=>{
+  const note=prompt('Nazwa remanentu (np. „po weekendzie 5–6.09” albo „przed zakupami”):',''); if(note===null) return;
+  if(!CAT.length) await loadCatalog();
+  const items=CAT.map(c=>({id:c.id,category:c.category,name:c.name,unit:c.unit||'',stock:c.stock??null}));
+  await api('POST','remanenty',{note:note.trim()||null,items},'return=minimal');
+  toast('Remanent zapisany'); loadSnaps();
+};
+$('s_clear').onclick=async()=>{
+  if(!confirm('Wyzerować stan magazynu dla wszystkich pozycji?\n\nJeśli chcesz zachować obecny stan w historii, najpierw kliknij „Zapisz remanent”.')) return;
+  await api('PATCH','catalog?stock=not.is.null',{stock:null,stock_updated_at:new Date().toISOString()},'return=minimal');
+  await loadCatalog(); renderShop(); toast('Stan magazynu wyczyszczony');
+};
+
+/* ---------- MOTYW ---------- */
+if(localStorage.getItem('pmb_theme')==='light') document.documentElement.classList.add('light');
+$('themeBtn').onclick=()=>{ const l=document.documentElement.classList.toggle('light'); localStorage.setItem('pmb_theme', l?'light':'dark'); };
 
 /* ---------- SETTINGS ---------- */
 $('set_save').onclick=()=>{ localStorage.setItem('pmb_crew_url',$('set_url').value.trim()); toast('Zapisano'); loadSettings(); };

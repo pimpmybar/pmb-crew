@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PMB — Menu do druku</title>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap");
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#e8e4dc;font-family:Georgia,serif;color:#222}
+/* pasek narzędzi — znika przy druku */
+.bar{background:#17171b;color:#f2f0ea;font-family:Inter,system-ui,sans-serif;font-size:13px;padding:12px 18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:9}
+.bar b{font-family:'Bebas Neue',Inter,sans-serif;letter-spacing:.05em}
+.bar .btn{border:1px solid #3a3a44;background:#1f1f25;color:#f2f0ea;border-radius:8px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+.bar .btn.primary{background:#e8b04b;border-color:#e8b04b;color:#151004}
+.bar label{display:flex;gap:6px;align-items:center;cursor:pointer;color:#c9c9d2;white-space:nowrap}
+.bar .muted{color:#9a9aa6}
+.wrap{display:flex;justify-content:center;padding:26px 10px}
+.page{width:595px;min-height:842px;height:842px;padding:46px 52px 36px;display:flex;flex-direction:column;background:#fff;position:relative;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.25)}
+svg.corner{position:absolute;width:50px;height:50px;opacity:.5}
+@page{size:A4 portrait;margin:0}
+@media print{
+  .bar{display:none!important}
+  html,body{margin:0!important;padding:0!important;width:210mm;height:297mm;overflow:hidden;background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .wrap{padding:0;display:flex;justify-content:center;align-items:flex-start}
+  .page{transform:scale(1.332);transform-origin:top center;box-shadow:none!important;page-break-after:avoid;page-break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>MENU DO DRUKU</b><span class="muted" id="evInfo">…</span>
+  <span id="drinkToggles" style="display:flex;gap:10px;flex-wrap:wrap"></span>
+  <span style="flex:1"></span>
+  <button class="btn primary" onclick="window.print()">🖨 Drukuj / PDF</button>
+</div>
+<div class="wrap"><div class="page" id="pg"><p style="padding:40px;color:#888;font-family:Inter,sans-serif" id="loading">Ładuję…</p></div></div>
+
+<script>
+const SUPABASE_URL='https://zqpqjgxtefzojhjglppb.supabase.co', SUPABASE_KEY='sb_publishable__bPrQF9K35vs8RbLdWBRXQ_VBVj2esQ';
+const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const Q=new URLSearchParams(location.search), evId=Q.get('id'), token=Q.get('t');
+
+/* ===== BIBLIOTEKA PMB (z Menu Buildera v13) ===== */
+const LIB=[
+ {name:"Red Lady",ing:"Wódka, puree truskawkowe, marakuja, limonka",desc:"Owoce lata w każdym łyku — truskawka, egzotyka i świeża limonka."},
+ {name:"Mangolita",ing:"Wódka, puree z mango, marakuja, limonka",desc:"Tropikalny hit weselny. Słodycz mango z orzeźwiającą kwasowością."},
+ {name:"Kiwi de Illa",ing:"Wódka, świeże kiwi, limonka",desc:"Lekki i zielony — idealna alternatywa dla fanów cytrusów."},
+ {name:"Chily Spiny",ing:"Wódka, chilli, limonka, puree z mango",desc:"Odważny, słodko-pikantny koktajl dla poszukiwaczy wrażeń."},
+ {name:"Polish Garden",ing:"Wódka, bazylia, cytryna, syrop z bzu, woda gazowana",desc:"Ogrodowy, ziołowy i kwiatowy — jak polskie lato w szklance."},
+ {name:"Grapefruit Mint Sour",ing:"Wódka, mięta, cytryna, grejpfrut, Angostura Bitters",desc:"Orzeźwiający sour z nutą bitterów i aromatem mięty."},
+ {name:"Espresso Martini",ing:"Wódka, espresso, likier kawowy, syrop cukrowy",desc:"Nocny pick-me-up — intensywne espresso w eleganckiej szklance."},
+ {name:"Pornstar Martini",aliases:["Porn Star Martini","Porn-Star Martini"],ing:"Wódka, wanilia, marakuja, cytryna, Prosecco",desc:"Zmysłowy, owocowy i zawsze efektowny."},
+ {name:"Caipiroska",ing:"Wódka, świeża limonka, cukier trzcinowy",desc:"Prosta i orzeźwiająca — dostępna w wersji truskawkowej i mango."},
+ {name:"Bloody Mary",ing:"Wódka, sok pomidorowy, tabasco, sos Worcestershire, cytryna",desc:"Pikantna legenda poranków — mocna, wyrazista, niezapomniana."},
+ {name:"East 8 Hold Up",ing:"Wódka, Aperol, marakuja, cytryna, sok z ananasa",desc:"Tropikalny, żywy i pełen owocowej energii."},
+ {name:"Vodka Sour",ing:"Wódka, sok z cytryny, syrop cukrowy, Angostura Bitters",desc:"Klasyczny sour w czystej, wódkowej odsłonie."},
+ {name:"Negroni",ing:"Gin, Martini Rosso, Campari",desc:"Ponadczasowy włoski klasyk — gorzki, zbalansowany i elegancki."},
+ {name:"Bramble",ing:"Gin, puree z jeżyn, cytryna, syrop cukrowy",desc:"Brytyjski klasyk z intensywnym smakiem leśnych jeżyn."},
+ {name:"Gin Basil Smash",ing:"Gin, bazylia, cytryna, syrop cukrowy",desc:"Świeży, ziołowy i intensywnie aromatyczny."},
+ {name:"Juniper & Elderflower Sour",ing:"Gin, cytryna, syrop z kwiatu bzu",desc:"Kwiatowa elegancja — jałowiec spotyka czarny bez."},
+ {name:"Parma Negroni",ing:"Gin, Campari, grejpfrut, tonik, Angostura Bitters",desc:"Lżejsza wersja Negroni z cytrusową świeżością."},
+ {name:"Old Fashioned",aliases:["Old Fashiooned"],ing:"Bourbon, cukier trzcinowy, Angostura Bitters, pomarańcza",desc:"Król bourbon cocktaili — prosty, mocny i bezapelacyjnie elegancki."},
+ {name:"Whisky Sour",ing:"Whisky, cytryna, syrop cukrowy, Angostura Bitters",desc:"Klasyczny sour o głębokiej słodyczy przełamanej kwasem."},
+ {name:"Manhattan",ing:"Bourbon, Martini Rosso, Angostura Bitters",desc:"Nowojorski klasyk — mocny, gładki, z wiśnią na koniec."},
+ {name:"New York Sour",aliases:["NY Sour"],ing:"Bourbon, cytryna, syrop cukrowy, Angostura, czerwone wino",desc:"Sour z pływającą warstwą czerwonego wina — efektowny wizualnie."},
+ {name:"Mint Julep",ing:"Bourbon, syrop cukrowy, mięta, Angostura Bitters",desc:"Letni klasyk z południa USA — miętowy, chłodny, odświeżający."},
+ {name:"Boulevardier",ing:"Bourbon, Campari, Martini Rosso",desc:"Whisky Negroni — głęboki, złożony, dla koneserów."},
+ {name:"Mojito",ing:"Rum, mięta, limonka, syrop cukrowy, woda gazowana",desc:"Niezniszczalny letni klasyk — świeży, lekki i orzeźwiający."},
+ {name:"Hemingway Daiquiri",ing:"Rum, likier maraschino, grejpfrut, cytryna",desc:"Ulubiony drink Hemingwaya — kwaśny, owocowy, lekki."},
+ {name:"Pina Colada",ing:"Rum, mleczko kokosowe, sok ananasowy, puree z ananasa",desc:"Tropikalne wakacje w szklance."},
+ {name:"Dark & Stormy",aliases:["Dark N Stormy","Dark'n'Stormy","Dark 'n' Stormy","Dark n Stormy"],ing:"Ciemny rum, imbir, cytryna, Angostura Bitters",desc:"Charakterny z dymnym rumem i imbirowym kopnięciem."},
+ {name:"Mai Tai",ing:"Rum jasny i ciemny, likier pomarańczowy, migdał, cytryna",desc:"Polinezyjski klasyk — słodki, owocowy, warstwowy."},
+ {name:"Aperol Spritz",ing:"Aperol, Prosecco, woda gazowana, pomarańcza",desc:"Włoski aperitif — lekki, musujący, absolutnie latem."},
+ {name:"Hugo",ing:"Prosecco, limonka, syrop z kwiatu bzu, woda gazowana",desc:"Alpejski hit — kwiatowy, lekki, idealny na przyjęcia."},
+ {name:"Margarita",ing:"Tequila, Triple Sec, cytryna, sól",desc:"Meksykański klasyk z solnym obrzeżem."},
+ {name:"Caipirinha",ing:"Cachaça, limonka, cukier trzcinowy",desc:"Brazylijski narodowy — prosty, kwaśny, niepowtarzalny."},
+ {name:"Long Island Ice Tea",ing:"Wódka, rum, gin, tequila, Triple Sec, cola, cytryna",desc:"Pięć alkoholi, jeden drink — legenda imprez."},
+ {name:"Pisco Sour",ing:"Pisco, cytryna, syrop cukrowy, białko jajka, Bitters",desc:"Peruwiański klasyk z aksamitną pianką z białka jajka."},
+ {name:"Virgin Mojito",aliases:["Mojito 0%"],mock:true,ing:"Świeża mięta, limonka, syrop cukrowy, woda gazowana",desc:"Klasyk Mojito w wersji bezalkoholowej — orzeźwiający i miętowy."},
+ {name:"No-jito Berry",mock:true,ing:"Maliny, jeżyny, limonka, mięta, woda gazowana",desc:"Owocowa wersja Mojito z bukietem leśnych jagód."},
+ {name:"Garden Spritz",mock:true,ing:"Syrop z bzu, ogórek, mięta, tonik, limonka",desc:"Lekki, ziołowy spritz — idealny na letnie popołudnia."},
+ {name:"Tropical Sunrise",mock:true,ing:"Sok pomarańczowy, sok z ananasa, marakuja, grenadyna",desc:"Słoneczny, kolorowy mocktail z gradientem tropikalnych smaków."},
+ /* pozycje PMB spoza buildera */
+ {name:"Gin & Tonic",aliases:["Gin&Tonic","G&T","Gin and Tonic"],ing:"Gin, tonik, limonka",desc:"Klasyka gatunku — chłodny, wytrawny i niezawodny."},
+ {name:"Paloma",ing:"Tequila, różowy grejpfrut, limonka, syrop z agawy, woda gazowana",desc:"Meksykański klasyk — cytrusowy, lekko gorzki i orzeźwiający."},
+ {name:"Hurricane",ing:"Rum, ananas, pomarańcza, limonka, marakuja",desc:"Nowoorleański huragan owoców — słodki, tropikalny, niebezpiecznie pyszny."},
+ {name:"Passion Cooler",aliases:["Passion Cooler 0%"],mock:true,ing:"Marakuja, limonka, syrop cukrowy, woda gazowana",desc:"Bezalkoholowe orzeźwienie z egzotyczną marakują."},
+ {name:"Bellini",ing:"Prosecco, purée brzoskwiniowe",desc:"Wenecki klasyk — delikatny, musujący, brzoskwiniowy."},
+];
+const norm=s=>String(s).toLowerCase().replace(/[’'`´]/g,"'").replace(/\s+/g,' ').replace(/\s*0\s*%$/,'').trim();
+const IDX={}; LIB.forEach(d=>{ const put=k=>{ if(!IDX[k]) IDX[k]=d; }; put(norm(d.name)); (d.aliases||[]).forEach(a=>put(norm(a))); });
+
+/* ===== PARSOWANIE MENU EVENTU ===== */
+const SKIP=/^(umowa|welcome|koktajl|menu|alkoholowe|bezalkoholowe|coffee|kubek|lód|lod|batch|piwo|frizzante|\*|serwis|herbat)/i;
+function parseMenu(txt){
+  const found=[], seen=new Set();
+  const add=(d,mock)=>{ const k=norm(d.name); if(seen.has(k))return; seen.add(k); found.push({...d, mock: mock||d.mock||false}); };
+  (txt||'').split(/\n+/).forEach(line=>{
+    line=line.trim(); if(!line||SKIP.test(line)) return;
+    // nazwa = to co przed — / – / "- " / "·"
+    let head=line.split(/\s+[—–]\s+|\s+-\s+|\s+·\s+/)[0].trim();
+    if(!head||head.length>44) return;
+    // "Whisky Sour / Old Fashioned" -> dwa drinki
+    head.split(/\s*\/\s*/).forEach(nm=>{
+      nm=nm.trim(); if(!nm) return;
+      const isMock=/0\s*%/.test(nm)||/bezalk/i.test(line);
+      const hit=IDX[norm(nm)];
+      if(hit) add(hit, hit.mock||isMock&&false); // przy wersjach alk+0% pokazujemy jedną pozycję
+      else if(/^[A-ZĄĆĘŁŃÓŚŹŻ]/.test(nm)&&!/\d/.test(nm)&&nm.length>=4) add({name:nm,ing:'',desc:''});
+    });
+  });
+  return found;
+}
+
+/* ===== SZABLON: VINTAGE SPEAKEASY — CZARNO-BIAŁE (MONO) ===== */
+const S={bg:'#ffffff',text:'#000000',title:'#000000',ing:'#333333',desc:'#444444',line:'#bbbbbb',accent:'#000000',footer:'#555555',sub:'#666666',
+  titleFont:"'Playfair Display', Georgia, serif",bodyFont:'Georgia, serif'};
+function cornerSVG(pos){ const t={tl:'top:24px;left:24px;',tr:'top:24px;right:24px;transform:scaleX(-1);',bl:'bottom:24px;left:24px;transform:scaleY(-1);',br:'bottom:24px;right:24px;transform:scale(-1,-1);'}[pos];
+  return `<svg class="corner" style="${t}" viewBox="0 0 50 50"><path d="M 0 0 L 50 0 L 50 4 L 4 4 L 4 50 L 0 50 Z" fill="${S.accent}"/><circle cx="10" cy="10" r="3" fill="${S.accent}"/></svg>`; }
+function ornament(){ return `<svg width="280" height="22" viewBox="0 0 280 22" style="display:block;margin:6px auto 18px;">
+  <line x1="0" y1="11" x2="90" y2="11" stroke="${S.accent}" stroke-width="1"/>
+  <polygon points="100,11 110,4 120,11 110,18" fill="none" stroke="${S.accent}" stroke-width="1"/>
+  <polygon points="130,11 140,2 150,11 140,20" fill="${S.accent}"/>
+  <polygon points="160,11 170,4 180,11 170,18" fill="none" stroke="${S.accent}" stroke-width="1"/>
+  <line x1="190" y1="11" x2="280" y2="11" stroke="${S.accent}" stroke-width="1"/></svg>`; }
+
+let DRINKS=[], EV=null;
+function render(){
+  const items=DRINKS.filter(d=>d.on);
+  const n=items.length, dense=n>10;
+  const nameSize=dense?'12px':'15.5px', ingSize=dense?'8px':'8.5px', descSize=dense?'9px':'9.5px', itemPad=dense?'6px':'11px', titleSize=dense?'30px':'36px';
+  const item=d=>{
+    const mock=d.mock?`<span style="display:inline-block;font-size:7.5px;background:#000;color:#fff;padding:1px 5px;border-radius:3px;margin-left:5px;vertical-align:2px;font-style:normal;letter-spacing:.06em;font-weight:600;font-family:Arial,sans-serif;">MOCKTAIL</span>`:'';
+    return `<div style="padding:${itemPad} 0;border-bottom:.5px solid ${S.line};">
+      <div style="font-size:${nameSize};font-weight:600;text-transform:uppercase;letter-spacing:.08em;font-family:${S.titleFont};color:${S.text};margin-bottom:3px;">${esc(d.name)}${mock}</div>
+      ${d.ing?`<div style="font-size:${ingSize};text-transform:uppercase;letter-spacing:.07em;color:${S.ing};font-family:${S.bodyFont};margin-bottom:3px;">${esc(d.ing)}</div>`:''}
+      ${d.desc?`<div style="font-size:${descSize};color:${S.desc};font-family:${S.bodyFont};font-style:italic;line-height:1.5;">${esc(d.desc)}</div>`:''}
+    </div>`; };
+  $('pg').innerHTML=`
+    ${cornerSVG('tl')}${cornerSVG('tr')}${cornerSVG('bl')}${cornerSVG('br')}
+    <div id="fitZone" style="flex:1;min-height:0;overflow:hidden;position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;">
+      <div id="fitInner" style="width:100%;">
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="width:100%;max-width:460px;">
+            <div style="text-align:center;">
+              <div style="font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:${S.sub};margin-bottom:8px;font-family:${S.bodyFont};">PIMP MY BAR · BAR EVENTS CONSULTING</div>
+              <div style="font-size:${titleSize};font-weight:700;letter-spacing:.12em;color:${S.title};line-height:1.1;margin-bottom:2px;font-family:${S.titleFont};text-transform:uppercase;">Menu Koktajli</div>
+              ${ornament()}
+            </div>
+            ${items.map(item).join('')||'<p style="text-align:center;color:#888;font-family:Inter,sans-serif;padding:30px">Zaznacz koktajle na pasku u góry.</p>'}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="text-align:center;border-top:.5px solid ${S.line};padding-top:12px;position:relative;z-index:2;">
+      <div style="font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:${S.footer};font-family:${S.bodyFont};">biuro@pimpmybar.pl &nbsp;·&nbsp; +48 513 916 977 &nbsp;·&nbsp; pimpmybar.pl</div>
+    </div>`;
+  fit();
+}
+function fit(){ const z=$('fitZone'),i=$('fitInner'); if(!z||!i)return; i.style.transform=''; i.style.transformOrigin='center center';
+  const zh=z.clientHeight, ih=i.getBoundingClientRect().height; if(ih>zh+1) i.style.transform='scale('+Math.max(.5,zh/ih).toFixed(4)+')'; }
+window.addEventListener('load',fit); if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{fit();setTimeout(fit,300);});
+function toggles(){
+  $('drinkToggles').innerHTML=DRINKS.map((d,i)=>`<label><input type="checkbox" data-i="${i}" ${d.on?'checked':''}>${esc(d.name)}</label>`).join('');
+  $('drinkToggles').querySelectorAll('input').forEach(c=>c.onchange=()=>{ DRINKS[c.dataset.i].on=c.checked; render(); });
+}
+
+/* ===== DANE ===== */
+(async()=>{
+  try{
+    let menuTxt='', label='';
+    if(token){
+      const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/crew_get`,{method:'POST',headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({p_token:token})});
+      const d=await r.json(); if(!d||!d.agenda){ $('loading').textContent='Menu będzie dostępne po akceptacji eventu.'; return; }
+      menuTxt=d.agenda.menu||''; label=`${d.event.name} · ${d.event.event_date}`;
+    } else if(evId){
+      const sess=JSON.parse(localStorage.getItem('pmb_session')||'null');
+      if(!sess){ $('loading').textContent='Otwórz menu z panelu (wymaga zalogowania).'; return; }
+      const r=await fetch(`${SUPABASE_URL}/rest/v1/events?id=eq.${evId}&select=name,event_date,menu`,{headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+sess.access_token}});
+      const [e]=await r.json(); if(!e){ $('loading').textContent='Nie znaleziono eventu.'; return; }
+      menuTxt=e.menu||''; label=`${e.name} · ${e.event_date}`; EV=e;
+    } else { $('loading').textContent='Brak parametru — otwórz z panelu lub z linku barmana.'; return; }
+    $('evInfo').textContent=label;
+    DRINKS=parseMenu(menuTxt).map(d=>({...d,on:true}));
+    if(!DRINKS.length){ $('loading').textContent='Nie rozpoznałem koktajli w menu tego eventu — uzupełnij pole Menu w panelu.'; toggles(); return; }
+    toggles(); render();
+  }catch(err){ $('loading').textContent='Błąd: '+err.message; }
+})();
+</script>
+</body>
+</html>

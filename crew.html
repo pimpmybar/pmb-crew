@@ -243,7 +243,7 @@ pre.txt{white-space:pre-wrap;font:inherit;margin:0;line-height:1.5}
         <div class="card" id="agCashCard"><h2>Rozliczenie z klientem</h2><p class="big" style="margin:0" id="agCash"></p></div>
         <div class="card" id="agDressCard"><h2>Dress code</h2><p class="big" style="margin:0" id="agDress"></p></div>
         <div class="card" id="agTransportCard"><h2>Transport</h2><pre class="txt" id="agTransport"></pre></div>
-        <div class="card" id="agMenuCard"><h2>Menu / receptury</h2><pre class="txt" id="agMenu"></pre></div>
+        <div class="card" id="agMenuCard"><h2>Menu / receptury</h2><pre class="txt" id="agMenu"></pre><a class="btn" id="agMenuPrint" target="_blank" style="display:inline-block;margin-top:10px">🖨 Menu do druku (dla gości)</a></div>
         <div class="card" id="agNotesCard"><h2>Uwagi</h2><pre class="txt" id="agNotes"></pre></div>
         <div class="card" id="agContactCard"><h2>Kontakt na miejscu</h2><p class="big" style="margin:0" id="agContact"></p></div>
       </div>
@@ -373,7 +373,7 @@ function render(){
       $('agLogCard').classList.toggle('hidden',!(ag.vehicle||ag.branding));
       $('agLog').innerHTML = [ag.vehicle?`<div><span class="note">Auto</span><br>${esc(ag.vehicle)}</div>`:'', ag.branding?`<div style="margin-top:8px"><span class="note">Klisza / branding</span><br>${esc(ag.branding)}</div>`:''].join('');
       $('agTransportCard').classList.toggle('hidden',!ag.transport); $('agTransport').textContent=ag.transport||'';
-      $('agMenuCard').classList.toggle('hidden',!ag.menu); $('agMenu').textContent=ag.menu||'';
+      $('agMenuCard').classList.toggle('hidden',!ag.menu); $('agMenu').textContent=ag.menu||''; $('agMenuPrint').href='menu.html?t='+encodeURIComponent(token);
       $('agNotesCard').classList.toggle('hidden',!ag.notes); $('agNotes').textContent=ag.notes||'';
       $('agContactCard').classList.toggle('hidden',!(ag.contact_name||ag.contact_phone));
       $('agContact').innerHTML = `${esc(ag.contact_name||'')}${ag.contact_phone?` · <a href="tel:${esc(ag.contact_phone)}">${esc(ag.contact_phone)}</a>`:''}`;
