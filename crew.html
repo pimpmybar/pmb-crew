@@ -240,7 +240,7 @@ pre.txt{white-space:pre-wrap;font:inherit;margin:0;line-height:1.5}
         <div class="card" id="agLogCard"><h2>Auto i branding</h2><div id="agLog" class="big"></div></div>
         <div class="card" id="agWhCard"><h2>Magazyn — jak wejść, co zrobić po powrocie</h2><pre class="txt" id="agWh"></pre></div>
         <div class="card" id="agPackCard"><h2>Spakuj (Twoje rzeczy)</h2><ul class="list" id="agPack"></ul></div>
-        <div class="card" id="agCashCard"><h2>Gotówka</h2><p class="big" style="margin:0" id="agCash"></p></div>
+        <div class="card" id="agCashCard"><h2>Rozliczenie z klientem</h2><p class="big" style="margin:0" id="agCash"></p></div>
         <div class="card" id="agDressCard"><h2>Dress code</h2><p class="big" style="margin:0" id="agDress"></p></div>
         <div class="card" id="agTransportCard"><h2>Transport</h2><pre class="txt" id="agTransport"></pre></div>
         <div class="card" id="agMenuCard"><h2>Menu / receptury</h2><pre class="txt" id="agMenu"></pre></div>
@@ -366,7 +366,7 @@ function render(){
       $('agMeeting').innerHTML = `<b>${esc(ag.meeting_time||'godzina do potwierdzenia')}</b><br>${esc(ag.meeting_place||'')}`;
       const pack=(ag.packing_list||'').split('\n').map(s=>s.trim()).filter(Boolean);
       $('agPackCard').classList.toggle('hidden',!pack.length); $('agPack').innerHTML = pack.map(p=>`<li>${esc(p)}</li>`).join('');
-      $('agCash').textContent = ag.cash_needed ? ('TAK — weź gotówkę na wydawanie reszty. '+(ag.cash_note||'')) : ('Nie musisz brać gotówki. '+(ag.cash_note||''));
+      if (ag.cash_note) { $('agCash').textContent = ag.cash_note; } else { $('agCashCard').style.display = 'none'; }
       $('agDressCard').classList.toggle('hidden',!ag.dress_code); $('agDress').textContent=ag.dress_code||'';
       $('agWhCard').classList.toggle('hidden',!ag.warehouse); $('agWh').textContent=ag.warehouse||'';
       $('agScheduleCard').classList.toggle('hidden',!ag.schedule); $('agSchedule').textContent=ag.schedule||'';

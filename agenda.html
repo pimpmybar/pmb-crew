@@ -148,7 +148,7 @@ function stage(el, t, x){ const T=el.querySelector('.t'); T.textContent=tbd(t)?'
   stage($('s5'), e.end_time, '');
   const maps=`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((e.venue?e.venue+', ':'')+(e.address||''))}`;
   kv($('kvPlace'),[['Obiekt',e.venue],['Adres',`<a href="${maps}" target="_blank">${esc(e.address||'')}</a>`,true],['Klient',e.client],['Organizator',e.organizer_phone?`<a href="tel:${esc(e.organizer_phone)}">${esc(e.organizer_phone)}</a>`:'',true],['Umowa',e.contract_url?`<a href="${esc(e.contract_url)}" target="_blank">otwórz umowę</a>`:'',true],['Płatność',e.payment_type],['Strona',e.venue_url?`<a href="${esc(e.venue_url)}" target="_blank">${esc(e.venue_url)}</a>`:'',true]]);
-  kv($('kvLog'),[['Bary',e.modules],['Klisza',e.branding],['Auto',e.vehicle],['Zbiórka',e.meeting_place],['Kontakt PMB',[e.contact_name,e.contact_phone].filter(Boolean).join(' · ')],['Gotówka',e.cash_needed?'TAK — '+(e.cash_note||''):(e.cash_note||'nie')],['Transport',e.transport],['Godziny',e.schedule]]);
+  kv($('kvLog'),[['Bary',e.modules],['Klisza',e.branding],['Auto',e.vehicle],['Zbiórka',e.meeting_place],['Kontakt PMB',[e.contact_name,e.contact_phone].filter(Boolean).join(' · ')],['Odbiór gotówki',e.cash_note||'—'],['Transport',e.transport],['Godziny',e.schedule]]);
   $('notes').innerHTML = e.notes? esc(e.notes).split(/\.\s+/).filter(Boolean).map(s=>`<div class="red">• ${s.replace(/\.$/,'')}</div>`).join('') : '<span class="sub">brak</span>';
   // crew
   const acc=asg.filter(a=>a.status==='zaakceptowany'), rest=asg.filter(a=>a.status!=='zaakceptowany'&&a.status!=='odrzucony');
