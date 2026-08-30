@@ -65,7 +65,7 @@ a{color:var(--acc)}
 .qc table{width:100%;border-collapse:collapse;font-size:13px}
 .qc td{padding:4px 0;border-bottom:1px dotted var(--line);vertical-align:top}
 .qc td.n{text-align:right;white-space:nowrap;font-weight:700;padding-left:10px}
-.qc td.note{color:var(--bad);font-weight:600;text-align:right;white-space:nowrap}
+.qc .nt{color:var(--bad);font-weight:600;font-size:12px;display:block;margin-top:1px}
 ul.list{margin:0;padding-left:18px}ul.list li{margin:3px 0}
 .foot{margin-top:24px;color:var(--muted);font-size:12px;display:flex;justify-content:space-between}
 .hidden{display:none!important}
@@ -162,7 +162,7 @@ function stage(el, t, x){ const T=el.querySelector('.t'); T.textContent=tbd(t)?'
   // quantities
   const filled=items.filter(i=>i.qty_num!=null||i.qty||i.note); const cats=[...new Set(filled.map(i=>i.category))];
   $('qSum').textContent=`${filled.length} pozycji`;
-  $('q').innerHTML = cats.map(c=>`<div class="qc"><h4>${esc(c)}</h4><table>${filled.filter(i=>i.category===c).map(i=>`<tr><td>${esc(i.name)}</td>${i.qty_num!=null?`<td class="n">${fmtN(i.qty_num)} ${esc(i.unit||'')}</td>`:`<td class="n">${esc(i.qty||'')}</td>`}${i.note?`<td class="note">${esc(i.note)}</td>`:'<td></td>'}</tr>`).join('')}</table></div>`).join('') || '<span class="sub">brak ilości — uzupełnij w panelu (Pakowanie → Ilości)</span>';
+  $('q').innerHTML = cats.map(c=>`<div class="qc"><h4>${esc(c)}</h4><table>${filled.filter(i=>i.category===c).map(i=>`<tr><td>${esc(i.name)}${i.note?`<span class="nt">${esc(i.note)}</span>`:''}</td>${i.qty_num!=null?`<td class="n">${fmtN(i.qty_num)} ${esc(i.unit||'')}</td>`:`<td class="n">${esc(i.qty||'')}</td>`}</tr>`).join('')}</table></div>`).join('') || '<span class="sub">brak ilości — uzupełnij w panelu (Pakowanie → Ilości)</span>';
   $('dress').innerHTML = e.dress_code? `<b>Dress code:</b> ${esc(e.dress_code)}`:'';
   $('pack').innerHTML = (e.packing_list||'').split('\n').filter(Boolean).map(l=>`<li>${esc(l)}</li>`).join('');
   $('wh').textContent = S.warehouse||'';
