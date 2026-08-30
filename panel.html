@@ -415,7 +415,7 @@ async function openEvent(id){
   $('h_type').value=cur.service_type||''; $('h_paytype').value=cur.payment_type||''; $('h_modules').value=cur.modules||''; $('h_contract').value=cur.contract_url||'';
   $('h_orgphone').value=cur.organizer_phone||''; $('h_km').value=cur.distance_km??''; $('h_tolls').value=cur.tolls||''; $('h_travel').value=cur.travel_time||''; $('h_depart').value=cur.departure_time||''; $('h_welcome').value=cur.welcome_drinks||'';
   $('e_contractBtn').classList.toggle('hidden', !cur.contract_url); $('e_contractBtn').href=cur.contract_url||'#';
-  $('e_agendaBtn').href='agenda.html?id='+cur.id; $('e_menuBtn').href='menu.html?id='+cur.id;
+  const PAGE_BASE=location.protocol==='file:'?'https://pimpmybar.github.io/pmb-crew/':''; $('e_agendaBtn').href=PAGE_BASE+'agenda.html?id='+cur.id; $('e_menuBtn').href=PAGE_BASE+'menu.html?id='+cur.id;
   $('g_transport').value=cur.transport||''; $('g_schedule').value=cur.schedule||''; $('g_vehicle').value=cur.vehicle||''; $('g_branding').value=cur.branding||''; $('g_menu').value=cur.menu||''; $('g_notes').value=cur.notes||''; $('g_pub').checked=!!cur.agenda_published;
   $('a_result').classList.add('hidden');
   await Promise.all([loadAsgs(), loadUpdates()]);

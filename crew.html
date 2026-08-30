@@ -373,7 +373,7 @@ function render(){
       $('agLogCard').classList.toggle('hidden',!(ag.vehicle||ag.branding));
       $('agLog').innerHTML = [ag.vehicle?`<div><span class="note">Auto</span><br>${esc(ag.vehicle)}</div>`:'', ag.branding?`<div style="margin-top:8px"><span class="note">Klisza / branding</span><br>${esc(ag.branding)}</div>`:''].join('');
       $('agTransportCard').classList.toggle('hidden',!ag.transport); $('agTransport').textContent=ag.transport||'';
-      $('agMenuCard').classList.toggle('hidden',!ag.menu); $('agMenu').textContent=ag.menu||''; $('agMenuPrint').href='menu.html?t='+encodeURIComponent(token);
+      $('agMenuCard').classList.toggle('hidden',!ag.menu); $('agMenu').textContent=ag.menu||''; $('agMenuPrint').href=(location.protocol==='file:'?'https://pimpmybar.github.io/pmb-crew/':'')+'menu.html?t='+encodeURIComponent(token);
       $('agNotesCard').classList.toggle('hidden',!ag.notes); $('agNotes').textContent=ag.notes||'';
       $('agContactCard').classList.toggle('hidden',!(ag.contact_name||ag.contact_phone));
       $('agContact').innerHTML = `${esc(ag.contact_name||'')}${ag.contact_phone?` · <a href="tel:${esc(ag.contact_phone)}">${esc(ag.contact_phone)}</a>`:''}`;
