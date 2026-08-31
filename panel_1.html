@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PMB Crew — panel</title>
+<meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0d0f;--card:#17171b;--card2:#1f1f25;--line:#2a2a32;--txt:#f2f0ea;--muted:#9a9aa6;--acc:#e8b04b;--ok:#4cc38a;--bad:#e5534b;--warn:#e8b04b;--r:14px}
+html.light{--bg:#f4f2ec;--card:#ffffff;--card2:#edeae1;--line:#dcd8cc;--txt:#1d1c18;--muted:#6d6c64;--acc:#b07a14;--ok:#1e8a5a;--bad:#c23b34;--warn:#b07a14}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,sans-serif;font-size:14px}
+.top{display:flex;align-items:center;gap:18px;padding:12px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.06em}.logo span{color:var(--acc)}
+.tabs{display:flex;gap:4px}.tabs button{background:none;border:0;color:var(--muted);padding:8px 12px;border-radius:8px;font:inherit;font-weight:500;cursor:pointer}
+.tabs button.on{background:var(--card2);color:var(--txt)}
+.sp{flex:1}
+.main{max-width:1180px;margin:0 auto;padding:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px}
+h1{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:.03em;margin:0 0 10px;font-weight:400}
+h2{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:0 0 10px}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+input,select,textarea{width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--acc)}
+textarea{min-height:64px;resize:vertical}
+.btn{border:0;border-radius:9px;padding:9px 14px;font:inherit;font-weight:600;cursor:pointer;background:var(--card2);color:var(--txt);border:1px solid var(--line)}
+.btn.primary{background:var(--acc);color:#151004;border-color:var(--acc)}
+.btn.sm{padding:5px 9px;font-size:12px}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.5}
+.grid{display:grid;gap:10px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g4{grid-template-columns:repeat(4,1fr)}
+.cols{display:grid;grid-template-columns:300px 1fr;gap:16px}
+@media(max-width:800px){.cols{grid-template-columns:1fr}.g3,.g4{grid-template-columns:1fr 1fr}}
+table{width:100%;border-collapse:collapse}th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--card2);color:var(--muted)}
+.pill.ok{background:rgba(76,195,138,.15);color:var(--ok)}.pill.warn{background:rgba(232,176,75,.15);color:var(--acc)}.pill.bad{background:rgba(229,83,75,.15);color:var(--bad)}.pill.info{background:rgba(120,160,255,.15);color:#8fb0ff}
+.evitem{padding:10px 12px;border-radius:10px;cursor:pointer;border:1px solid transparent;margin-bottom:4px}
+.evitem:hover{background:var(--card2)}.evitem.on{border-color:var(--acc);background:var(--card2)}
+.evitem b{display:block}.evitem small{color:var(--muted)}
+.muted{color:var(--muted)}.right{text-align:right}.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.hidden{display:none!important}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--acc);color:#151004;padding:10px 16px;border-radius:10px;font-weight:600;z-index:9}
+.stat{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px}.stat div{background:var(--card2);padding:8px 12px;border-radius:9px}.stat b{font-size:18px;display:block}
+.login{max-width:360px;margin:80px auto}
+.check{display:flex;align-items:center;gap:8px;margin-top:10px}.check input{width:auto}
+</style>
+</head>
+<body>
+
+<div id="loginView" class="login hidden">
+  <div class="logo" style="margin-bottom:20px">PIMP MY BAR <span>CREW</span></div>
+  <div class="card">
+    <label>E-mail</label><input id="l_email" type="email" value="t.malinowski@pimpmybar.pl">
+    <label>Hasło</label><input id="l_pass" type="password">
+    <div class="muted" id="l_err" style="margin-top:8px"></div>
+    <button class="btn primary" style="width:100%;margin-top:14px" id="l_btn">Zaloguj</button>
+  </div>
+</div>
+
+<div id="appView" class="hidden">
+  <div class="top">
+    <div class="logo">PIMP MY BAR <span>CREW</span></div>
+    <div class="tabs"><button data-t="events" class="on">Eventy</button><button data-t="people">Ludzie</button><button data-t="menu">Menu</button><button data-t="shop">Zakupy</button><button data-t="settings">Ustawienia</button></div>
+    <div class="sp"></div>
+    <button class="btn sm" id="themeBtn" title="Jasny / ciemny motyw">◐</button> <button class="btn sm" id="logout">Wyloguj</button>
+  </div>
+  <div class="main">
+
+    <!-- ===== EVENTY ===== -->
+    <div id="t_events">
+      <div class="cols">
+        <div>
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h2 style="margin:0">Eventy</h2><button class="btn sm" id="newEvent">+ Nowy</button></div>
+            <div id="evList"></div>
+          </div>
+        </div>
+        <div id="evPane" class="hidden">
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+              <div><h1 id="e_title" style="margin-bottom:2px"></h1><div class="muted" id="e_sub"></div><div style="margin-top:6px;display:flex;gap:6px"><a class="btn sm primary" id="e_agendaBtn" target="_blank">Agenda PMB (podgląd / druk)</a><a class="btn sm" id="e_menuBtn" target="_blank">Menu do druku</a><a class="btn sm hidden" id="e_contractBtn" target="_blank" rel="noopener">Otwórz umowę</a></div></div>
+              <div class="tabs"><button data-s="crew" class="on">Skład</button><button data-s="agenda">Agenda</button><button data-s="pack">Pakowanie</button><button data-s="edit">Dane eventu</button></div>
+            </div>
+          </div>
+
+          <!-- SKŁAD -->
+          <div id="s_crew">
+            <div class="card">
+              <div class="stat" id="stat"></div>
+              <table><thead><tr><th>Osoba</th><th>Rola</th><th>Stawka</th><th>Status</th><th>Link</th><th></th></tr></thead><tbody id="asgBody"></tbody></table>
+            </div>
+            <div class="card">
+              <h2>Dodaj osobę do eventu i wygeneruj link</h2>
+              <div class="grid g4">
+                <div><label>Telefon (WhatsApp)</label><input id="a_phone" placeholder="+48 600 000 000" list="phoneList"><datalist id="phoneList"></datalist></div>
+                <div><label>Imię (jeśli znasz)</label><input id="a_first"></div>
+                <div><label>Rola</label><select id="a_role"><option value="barman">Barman</option><option value="pomocnik">Pomocnik</option></select></div>
+                <div><label>Stawka</label><div style="display:flex;gap:6px"><input id="a_rate" type="number" inputmode="numeric" placeholder="zł"><select id="a_unit" style="width:110px"><option value="event">/ event</option><option value="godzina">/ godz.</option></select></div></div>
+              </div>
+              <label>Dopisek do stawki (np. netto, umowa zlecenie, płatne do 7 dni)</label><input id="a_note" placeholder="netto, umowa zlecenie">
+              <div style="display:flex;gap:8px;align-items:center;margin-top:12px"><button class="btn primary" id="a_add">Wygeneruj link</button><span class="muted" id="a_msg"></span></div>
+              <div id="a_result" class="card hidden" style="margin:12px 0 0;background:var(--card2)">
+                <div class="mono" id="a_link" style="word-break:break-all"></div>
+                <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn sm" id="a_copy">Kopiuj link</button><button class="btn sm" id="a_copyMsg">Kopiuj gotową wiadomość</button><a class="btn sm" id="a_wa" target="_blank">Otwórz WhatsApp</a></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AGENDA -->
+          <div id="s_agenda" class="hidden">
+            <div class="card">
+              <h2>Nagłówek agendy (dla Ciebie)</h2>
+              <div class="grid g3">
+                <div><label>Typ eventu</label><input id="h_type" placeholder="EVENT BAR / WEDDING BAR / COFFEE BAR"></div>
+                <div><label>Kwota po evencie</label><input id="h_paytype" placeholder="Faktura / gotówka"></div>
+                <div><label>Bar mobilny (liczba modułów)</label><input id="h_modules" placeholder="np. 10 modułów"></div>
+              </div>
+              <label>Umowa (link Google Drive)</label><input id="h_contract" placeholder="https://drive.google.com/...">
+              <div class="grid g4">
+                <div><label>Telefon do organizatora</label><input id="h_orgphone"></div>
+                <div><label>Liczba km</label><input id="h_km" type="number"></div>
+                <div><label>Bramki</label><input id="h_tolls" placeholder="- / ok. 40 zł"></div>
+                <div><label>Czas podróży</label><input id="h_travel" placeholder="np. 30 min"></div>
+              </div>
+              <div class="grid g2">
+                <div><label>Czas wyjazdu z magazynu</label><input id="h_depart" placeholder="np. 12:00"></div>
+                <div><label>Welcome drinks</label><input id="h_welcome" placeholder="np. 900 piw w wannach"></div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:14px;align-items:center"><button class="btn primary" id="h_save">Zapisz nagłówek</button></div>
+            </div>
+            <div class="card">
+              <h2>Agenda dla składu (widzą tylko ci, którzy zaakceptowali)</h2>
+              <div class="grid g2">
+                <div><label>Miejsce zbiórki</label><input id="g_place"></div>
+                <div><label>Godzina zbiórki</label><input id="g_time" placeholder="np. 11:30"></div>
+              </div>
+              <label>Dress code</label><input id="g_dress">
+              <label>Co spakować (jedna rzecz w linii)</label><textarea id="g_pack" style="min-height:110px"></textarea>
+              <div class="check"><input type="checkbox" id="g_cash"><label style="margin:0">Na koniec odbieramy gotówkę od klienta (wesela / eventy prywatne)</label></div>
+              <label>Gotówka do odebrania — kwota i zasady (to widzi barman)</label><input id="g_cashnote" placeholder="np. Rozliczenie gotówką na miejscu — 4 200 zł do rąk własnych">
+              <div class="grid g2">
+                <div><label>Kontakt na miejscu — imię</label><input id="g_cname" value="Tomek"></div>
+                <div><label>Kontakt — telefon</label><input id="g_cphone"></div>
+              </div>
+              <label>Godziny pracy (eventy wielodniowe — jedna linia na dzień)</label><textarea id="g_schedule" placeholder="12.06 — 15:00–20:00&#10;13.06 — 8:00–18:00"></textarea>
+              <div class="grid g2">
+                <div><label>Auto</label><input id="g_vehicle" placeholder="np. COMBO + bus"></div>
+                <div><label>Klisza / branding</label><input id="g_branding" placeholder="np. klisza klienta SKODA, zielone tło"></div>
+              </div>
+              <label>Transport (kto z kim, o której wyjazd)</label><textarea id="g_transport"></textarea>
+              <label>Menu / receptury <button class="btn sm" id="g_menuPick" type="button" style="margin-left:8px">+ Wstaw z biblioteki</button></label>
+              <div id="g_menuPicker" class="hidden" style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;max-height:260px;overflow:auto;background:var(--card2)">
+                <input id="g_menuSearch" placeholder="Szukaj koktajlu…" style="margin-bottom:8px">
+                <div id="g_menuList" style="columns:2;column-gap:16px"></div>
+                <div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm primary" id="g_menuInsert" type="button">Wstaw zaznaczone</button><button class="btn sm" id="g_menuClose" type="button">Zamknij</button></div>
+              </div>
+              <textarea id="g_menu" style="min-height:120px"></textarea>
+              <label>Uwagi</label><textarea id="g_notes"></textarea>
+              <div class="check"><input type="checkbox" id="g_pub"><label style="margin:0">Agenda opublikowana (widoczna pod linkami)</label></div>
+              <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center">
+                <button class="btn primary" id="g_save">Zapisz agendę</button>
+                <span class="muted" id="g_msg"></span>
+              </div>
+            </div>
+            <div class="card">
+              <h2>Wyślij aktualizację do składu</h2>
+              <p class="muted" style="margin-top:0">Wpis pojawi się pod linkiem każdego, kto zaakceptował, z plakietką NOWE. Do tego kopiujesz gotową wiadomość na grupę WhatsApp.</p>
+              <input id="u_msg" placeholder="np. Dodałem zbiórkę i listę rzeczy do spakowania — sprawdźcie swoje linki">
+              <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center"><button class="btn primary" id="u_send">Zapisz aktualizację</button><button class="btn" id="u_copy">Kopiuj wiadomość na grupę</button><span class="muted" id="u_info"></span></div>
+              <div id="u_list" style="margin-top:12px"></div>
+            </div>
+          </div>
+
+          <!-- PAKOWANIE -->
+          <div id="s_pack" class="hidden">
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                <h2 style="margin:0">Pakowanie eventu — na żywo</h2>
+                <div style="display:flex;gap:6px"><button class="btn sm" id="pk_refresh">Odśwież</button><button class="btn sm" id="pk_reset">Wyzeruj odhaczenia</button><button class="btn sm danger" id="pk_clear">Usuń listę</button></div>
+              </div>
+              <div class="stat" id="pk_stat" style="margin-top:10px"></div>
+              <div id="pk_list"></div>
+            </div>
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                <h2 style="margin:0">Ilości na ten event (agenda PMB)</h2>
+                <div style="display:flex;gap:6px;align-items:center"><input id="q_search" placeholder="szukaj pozycji…" style="width:200px"><label class="check" style="margin:0"><input type="checkbox" id="q_onlyFilled"> tylko wypełnione</label></div>
+              </div>
+              <p class="muted" style="margin-top:6px">Wpisz ilość przy pozycji — zapisuje się samo. Uwagi: KOSZ, KLIENT, „-”. Stan = remanent magazynu (edytuj w Zakupach).</p>
+              <div id="q_grid"></div>
+              <div class="card" style="margin:12px 0 0;background:var(--card2)">
+                <h2>Dodaj pozycję do katalogu (będzie w każdej agendzie)</h2>
+                <div class="grid g4">
+                  <div><label>Kategoria</label><input id="q_cat" list="catList" placeholder="np. OWOCE"><datalist id="catList"></datalist></div>
+                  <div><label>Nazwa</label><input id="q_name"></div>
+                  <div><label>Jednostka</label><select id="q_unit"><option>szt.</option><option>bt</option><option>l</option><option>kg</option><option>g</option><option>opak.</option></select></div>
+                  <div><label>Stan magazynu</label><input id="q_stock" type="number"></div>
+                </div>
+                <button class="btn primary" style="margin-top:10px" id="q_add">Dodaj pozycję</button>
+              </div>
+            </div>
+            <div class="card hidden">
+              <h2>Dodaj pozycje hurtem</h2>
+              <p class="muted" style="margin-top:0">Kategoria w linii zaczynającej się od <span class="mono">#</span>, potem pozycje: <span class="mono">nazwa | ilość</span>. Ilość może być liczbą, „KOSZ”, „KLIENT” albo „?”.</p>
+              <textarea id="pk_bulk" style="min-height:160px;font-family:ui-monospace,Menlo,monospace;font-size:12px" placeholder="# ALKOHOLE&#10;Seagram's Gin 0,7 | 35 bt&#10;# OWOCE&#10;Limonki | 30 szt.&#10;Mięta | KOSZ"></textarea>
+              <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap"><button class="btn primary" id="pk_add">Dodaj do listy</button><button class="btn" id="pk_tpl">Wstaw szablon PMB (check list)</button><span class="muted" id="pk_msg"></span></div>
+            </div>
+          </div>
+
+          <!-- DANE EVENTU -->
+          <div id="s_edit" class="hidden">
+            <div class="card">
+              <div class="grid g2">
+                <div><label>Nazwa eventu</label><input id="e_name"></div>
+                <div><label>Klient</label><input id="e_client"></div>
+              </div>
+              <div class="grid g4">
+                <div><label>Data</label><input id="e_date" type="date"></div>
+                <div><label>Od</label><input id="e_start" placeholder="16:00"></div>
+                <div><label>Do</label><input id="e_end" placeholder="00:00"></div>
+                <div><label>Status</label><select id="e_status"><option value="wstepny">Wstępny (zapytanie)</option><option value="potwierdzony">Potwierdzony (umowa)</option><option value="zakonczony">Zakończony</option><option value="anulowany">Anulowany</option></select></div>
+              </div>
+              <div class="grid g2">
+                <div><label>Miejsce</label><input id="e_venue"></div>
+                <div><label>Adres</label><input id="e_address"></div>
+              </div>
+              <div class="grid g2">
+                <div><label>Strona obiektu (www)</label><input id="e_vurl" placeholder="https://..."></div>
+                <div><label>Link do mapy (opcjonalnie, inaczej Google z adresu)</label><input id="e_map" placeholder="https://maps.app.goo.gl/..."></div>
+              </div>
+              <div class="grid g2">
+                <div><label>Forma wynagrodzenia (widoczna przy stawce)</label><input id="e_pay" placeholder="np. Gotówka po evencie. Wypłata w poniedziałek po weekendzie."></div>
+                <div><label>Dojazd z magazynu (orientacyjnie)</label><input id="e_travel" placeholder="np. ~35 min / 28 km autem"></div>
+              </div>
+              <div class="grid g3">
+                <div><label>Gości</label><input id="e_guests" type="number"></div>
+                <div><label>Barmanów</label><input id="e_bart" type="number"></div>
+                <div><label>Pomocników</label><input id="e_help" type="number"></div>
+              </div>
+              <label>Opis dla barmana (widoczny przed akceptacją)</label><textarea id="e_summary"></textarea>
+              <h2 style="margin-top:18px">Link grupowy (jeden na grupę WhatsApp)</h2>
+              <p class="muted" style="margin-top:0">Każdy, kto kliknie, podaje swój numer i dostaje osobisty link. Tworzy wpis TYLKO dla nowych numerów (stawka domyślna poniżej). Osoby dodane w Składzie dostają od Ciebie link osobisty — przez link grupowy zobaczą tylko „jesteś już na liście”.</p>
+              <div class="grid g3">
+                <div><label>Stawka domyślna — barman (zł / event)</label><input id="e_drb" type="number"></div>
+                <div><label>Stawka domyślna — pomocnik (zł / event)</label><input id="e_drh" type="number"></div>
+                <div><label>Dopisek do stawki</label><input id="e_drn" placeholder="netto, umowa zlecenie"></div>
+              </div>
+              <div class="check"><input type="checkbox" id="e_open"><label style="margin:0">Zapisy przez link grupowy otwarte</label></div>
+              <div class="card" style="margin:10px 0 0;background:var(--card2)">
+                <div class="mono" id="e_invite" style="word-break:break-all"></div>
+                <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn sm" id="e_invCopy">Kopiuj link</button><button class="btn sm" id="e_invMsg">Kopiuj wiadomość na grupę</button></div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:14px;align-items:center"><button class="btn primary" id="e_save">Zapisz</button><button class="btn danger" id="e_del">Usuń event</button><span class="muted" id="e_msg"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== LUDZIE ===== -->
+    <div id="t_people" class="hidden">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h2 style="margin:0">Baza ludzi</h2><div style="display:flex;gap:6px;align-items:center"><div class="tabs" id="p_filter"><button data-f="" class="on">Wszyscy</button><button data-f="nowy">Nowi</button><button data-f="aktywny">Aktywni</button><button data-f="rezerwa">Rezerwa</button><button data-f="nieaktywny">Nieaktywni</button></div><input id="p_search" placeholder="szukaj…" style="width:180px"></div></div>
+        <table><thead><tr><th>Imię i nazwisko</th><th>Status</th><th>Telefon</th><th>Miasto</th><th>Prawo jazdy</th><th>Auto</th><th>Rozmiar</th><th>Student</th><th>Eventy</th><th>Doświadczenie</th></tr></thead><tbody id="peopleBody"></tbody></table>
+      </div>
+      <div class="card hidden" id="personCard">
+        <h2>Edycja osoby</h2>
+        <div class="grid g4">
+          <div><label>Imię</label><input id="pe_first"></div><div><label>Nazwisko</label><input id="pe_last"></div>
+          <div><label>Telefon</label><input id="pe_phone"></div><div><label>E-mail</label><input id="pe_email"></div>
+          <div><label>Miasto</label><input id="pe_city"></div><div><label>Rozmiar</label><input id="pe_size"></div>
+          <div><label>Domyślna rola</label><select id="pe_role"><option value="barman">Barman</option><option value="pomocnik">Pomocnik</option></select></div>
+          <div><label>Ocena (1–5)</label><input id="pe_rating" type="number" min="1" max="5"></div>
+          <div><label>Status</label><select id="pe_status"><option value="nowy">nowy</option><option value="aktywny">aktywny</option><option value="rezerwa">rezerwa</option><option value="nieaktywny">nieaktywny</option></select></div>
+          <div><label>Warunki zaakceptowane</label><input id="pe_terms" disabled></div>
+        </div>
+        <div class="grid g2">
+          <div><label>Doświadczenie</label><select id="pe_exp"><option value="">—</option><option>brak</option><option>1 rok</option><option>2–4 lata</option><option>powyżej 5 lat</option></select></div>
+          <div><label>Prawo jazdy</label><select id="pe_lic"><option value="">—</option><option value="true">tak</option><option value="false">nie</option></select></div>
+          <div><label>Swoje auto</label><select id="pe_car"><option value="">—</option><option value="true">tak</option><option value="false">nie</option></select></div>
+        </div>
+        <label>Stały link barmana — „Moje eventy” (kalendarz)</label>
+        <div style="display:flex;gap:8px;align-items:center"><input id="pe_mylink" readonly style="flex:1"><button class="btn sm" id="pe_mycopy">Kopiuj</button></div>
+        <label>Notatki (tylko dla Ciebie)</label><textarea id="pe_notes"></textarea>
+        <div class="check"><input type="checkbox" id="pe_active"><label style="margin:0">Aktywny</label></div>
+        <div style="display:flex;gap:8px;margin-top:14px"><button class="btn primary" id="pe_save">Zapisz</button><span class="muted" id="pe_msg"></span></div>
+      </div>
+    </div>
+
+    <!-- ===== ZAKUPY ===== -->
+    <!-- ===== MENU / RECEPTURY ===== -->
+    <div id="t_menu" class="hidden">
+      <div class="grid2" style="display:grid;grid-template-columns:minmax(280px,1fr) minmax(320px,1.4fr);gap:14px;align-items:start">
+        <div class="card">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><h2 style="margin:0;flex:1">Biblioteka menu</h2><button class="btn sm primary" id="r_new">+ Nowa pozycja</button></div>
+          <input id="r_search" placeholder="Szukaj (nazwa, składnik)…" style="margin-bottom:10px">
+          <div id="r_list" class="muted">Ładowanie…</div>
+        </div>
+        <div class="card" id="r_editor">
+          <h2>Pozycja menu</h2>
+          <p class="muted" id="r_hint" style="margin-top:0">Kliknij pozycję po lewej albo dodaj nową. Te dane widzi barman (skład + manual) i trafiają na kartę menu dla gości (składniki + opis).</p>
+          <div id="r_form" class="hidden">
+            <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+              <div><label>Nazwa</label><input id="r_name"></div>
+              <div><label>Kategoria</label><input id="r_cat" list="r_cats"><datalist id="r_cats"></datalist></div>
+            </div>
+            <label>Inne nazwy (po przecinku — do rozpoznawania w menu eventu)</label><input id="r_aliases" placeholder="np. Porn Star Martini, Porn-Star Martini">
+            <label>Składniki dla gości (karta menu)</label><input id="r_ing">
+            <label>Opis dla gości (1 zdanie)</label><input id="r_descr">
+            <label>Skład z miarami (dla barmana)</label><textarea id="r_recipe" style="min-height:60px"></textarea>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+              <div><label>Szkło</label><input id="r_glass"></div><div><label>Lód</label><input id="r_ice"></div><div><label>Garnish</label><input id="r_garnish"></div>
+            </div>
+            <label>Manual — jak przygotować</label><textarea id="r_method" style="min-height:90px"></textarea>
+            <div style="display:flex;gap:16px;align-items:center;margin-top:8px">
+              <label class="check" style="margin:0"><input type="checkbox" id="r_mock"> bezalkoholowy (MOCKTAIL)</label>
+              <label class="check" style="margin:0"><input type="checkbox" id="r_active" checked> aktywna</label>
+              <div><label style="margin:0 0 2px">Kolejność</label><input id="r_sort" type="number" style="width:80px;padding:5px 8px"></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:14px;align-items:center"><button class="btn primary" id="r_save">Zapisz</button><button class="btn danger" id="r_del">Usuń</button><span class="muted" id="r_msg"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="t_shop" class="hidden">
+      <div class="card">
+        <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+          <div><label>Eventy od</label><input id="s_from" type="date" style="width:160px"></div>
+          <div><label>do</label><input id="s_to" type="date" style="width:160px"></div>
+          <button class="btn primary" id="s_run">Policz</button>
+          <label class="check" style="margin:0"><input type="checkbox" id="s_onlyOrder" checked> tylko do zamówienia</label>
+          <div class="sp"></div>
+          <button class="btn" id="s_copy">Kopiuj zamówienie</button><button class="btn" id="s_csv">Kopiuj jako CSV</button> <button class="btn" id="s_snap">Zapisz remanent</button><button class="btn danger" id="s_clear">Wyczyść stan</button>
+        </div>
+        <p class="muted" style="margin:10px 0 0">Suma ilości z agend eventów w zakresie (statusy wstępny + potwierdzony), minus stan magazynu = do zamówienia. Stan edytujesz bezpośrednio w tabeli (remanent).</p>
+        <div id="s_events" class="muted" style="margin-top:6px"></div>
+        <div style="overflow-x:auto;margin-top:10px"><div id="s_table"></div></div>
+      </div>
+      <div class="card">
+        <h2>Remanenty — historia</h2>
+        <p class="muted" style="margin-top:0">„Zapisz remanent” robi zdjęcie aktualnego stanu magazynu. Po evencie wpisz, co wróciło, zapisz nowy remanent i porównasz — widać, co zeszło i co zostało.</p>
+        <div id="s_snaps" class="muted">—</div>
+        <div style="overflow-x:auto;margin-top:10px"><div id="s_snapView"></div></div>
+      </div>
+    </div>
+
+    <!-- ===== USTAWIENIA ===== -->
+    <div id="t_settings" class="hidden">
+      <div class="card">
+        <h2>Link rekrutacyjny („Dołącz do ekipy PMB”)</h2>
+        <p class="muted" style="margin-top:0">Bez eventu i bez stawki. Osoba wypełnia dane, akceptuje warunki i ląduje w Ludziach ze statusem „nowy”. Ten link możesz wrzucić na grupę FB.</p>
+        <div class="mono" id="set_recruit" style="word-break:break-all"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center"><button class="btn sm" id="set_recruitCopy">Kopiuj link</button><label class="check" style="margin:0"><input type="checkbox" id="set_recruitOpen"> Nabór otwarty</label></div>
+      </div>
+      <div class="card">
+        <h2>Warunki współpracy</h2>
+        <p class="muted" style="margin-top:0">Widoczne w linku rekrutacyjnym i przy pierwszym evencie każdej osoby (z checkboxem akceptacji, data zapisuje się przy osobie). Nagłówki sekcji to linie bez numeru.</p>
+        <textarea id="set_terms" style="min-height:320px;font-size:13px;line-height:1.5"></textarea>
+      </div>
+      <div class="card">
+        <h2>Instrukcja magazynu</h2>
+        <p class="muted" style="margin-top:0">Doczepia się automatycznie do agendy każdego eventu, którego zbiórka jest w magazynie (Szarych Szeregów). Jak wejść, gdzie klucz, gdzie parkować, co zrobić po powrocie.</p>
+        <textarea id="set_wh" style="min-height:140px;font-size:13px;line-height:1.5"></textarea>
+        <button class="btn primary" style="margin-top:10px" id="set_saveAll">Zapisz warunki i instrukcję</button>
+        <span class="muted" id="set_msg"></span>
+      </div>
+      <div class="card">
+        <h2>Adres strony barmana</h2>
+        <p class="muted" style="margin-top:0">Pełny adres, pod którym wisi <span class="mono">crew.html</span>. Linki dla ludzi są budowane z tego adresu.</p>
+        <input id="set_url">
+        <button class="btn primary" style="margin-top:10px" id="set_save">Zapisz</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="toast" class="toast hidden"></div>
+
+<script>
+const SUPABASE_URL = 'https://zqpqjgxtefzojhjglppb.supabase.co';
+const SUPABASE_KEY = 'sb_publishable__bPrQF9K35vs8RbLdWBRXQ_VBVj2esQ';
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const money = n => n==null?'—':Number(n).toLocaleString('pl-PL')+' zł';
+let session = null, events=[], people=[], cur=null, asgs=[], curPerson=null;
+const CREW_URL_DEFAULT = 'https://pimpmybar.github.io/pmb-crew/crew.html';
+const crewUrl = () => { const saved = localStorage.getItem('pmb_crew_url'); if (saved && /^https?:\/\//.test(saved)) return saved;
+  if (location.protocol === 'file:') return CREW_URL_DEFAULT;
+  return location.href.replace(/[^\/]*panel[^\/]*\.html.*$/, 'crew.html'); };
+
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'),2200); }
+
+/* ---------- AUTH ---------- */
+async function auth(path, body){
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/${path}`,{method:'POST',headers:{'apikey':SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const j = await r.json(); if(!r.ok) throw new Error(j.error_description||j.msg||j.error||'auth'); return j;
+}
+function saveSession(s){ session=s; localStorage.setItem('pmb_session',JSON.stringify(s)); }
+async function ensureSession(){
+  const s = JSON.parse(localStorage.getItem('pmb_session')||'null'); if(!s) return false;
+  if(s.expires_at*1000 - Date.now() > 60000){ session=s; return true; }
+  try { saveSession(await auth('token?grant_type=refresh_token',{refresh_token:s.refresh_token})); return true; } catch(e){ return false; }
+}
+$('l_btn').onclick = async()=>{
+  $('l_err').textContent=''; try { saveSession(await auth('token?grant_type=password',{email:$('l_email').value.trim(),password:$('l_pass').value})); start(); }
+  catch(e){ $('l_err').textContent='Nie udało się zalogować: '+e.message; }
+};
+$('l_pass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('l_btn').click(); });
+$('logout').onclick = ()=>{ localStorage.removeItem('pmb_session'); location.reload(); };
+
+/* ---------- REST ---------- */
+async function api(method, path, body, prefer){
+  if(session && session.expires_at*1000 - Date.now() < 60000) await ensureSession();
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{method,headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json','Prefer':prefer||'return=representation'},body: body?JSON.stringify(body):undefined});
+  if(r.status===401){ localStorage.removeItem('pmb_session'); location.reload(); return; }
+  if(!r.ok) throw new Error(await r.text());
+  const t = await r.text(); return t? JSON.parse(t) : null;
+}
+
+/* ---------- TABS ---------- */
+document.querySelectorAll('.top .tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.top .tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  ['events','people','menu','shop','settings'].forEach(t=>$('t_'+t).classList.toggle('hidden',t!==b.dataset.t));
+  if(b.dataset.t==='shop') loadShop(); if(b.dataset.t==='menu') loadRecipes();
+  if(b.dataset.t==='people') loadPeople(); if(b.dataset.t==='settings') loadSettings();
+});
+document.querySelectorAll('#evPane .tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#evPane .tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  ['crew','agenda','pack','edit'].forEach(s=>$('s_'+s).classList.toggle('hidden',s!==b.dataset.s));
+  if(b.dataset.s==='pack') loadPack();
+});
+
+/* ---------- EVENTS ---------- */
+const STATUS = {wstepny:['Wstępny','warn'],potwierdzony:['Potwierdzony','ok'],zakonczony:['Zakończony',''],anulowany:['Anulowany','bad']};
+async function loadEvents(){
+  events = await api('GET','events?select=*&order=event_date.desc');
+  $('evList').innerHTML = events.map(e=>`<div class="evitem ${cur&&cur.id===e.id?'on':''}" data-id="${e.id}"><b>${esc(e.name)}</b><small>${e.event_date} · <span class="pill ${STATUS[e.status]?.[1]||''}">${STATUS[e.status]?.[0]||e.status}</span></small></div>`).join('') || '<div class="muted">Brak eventów</div>';
+  document.querySelectorAll('.evitem').forEach(el=>el.onclick=()=>openEvent(el.dataset.id));
+}
+async function openEvent(id){
+  cur = events.find(e=>e.id===id); if(!cur) return;
+  document.querySelectorAll('.evitem').forEach(el=>el.classList.toggle('on',el.dataset.id===id));
+  $('evPane').classList.remove('hidden');
+  $('e_title').textContent=cur.name; $('e_sub').textContent=`${cur.event_date} · ${cur.start_time||''}–${cur.end_time||''} · ${cur.venue||''}`;
+  // edit
+  $('e_name').value=cur.name||''; $('e_client').value=cur.client||''; $('e_date').value=cur.event_date||''; $('e_start').value=cur.start_time||''; $('e_end').value=cur.end_time||'';
+  $('e_status').value=cur.status; $('e_venue').value=cur.venue||''; $('e_address').value=cur.address||''; $('e_map').value=cur.map_url||'';
+  $('e_vurl').value=cur.venue_url||''; $('e_pay').value=cur.payment_info||''; $('e_travel').value=cur.travel_note||'';
+  $('e_drb').value=cur.default_rate_bartender??''; $('e_drh').value=cur.default_rate_helper??''; $('e_drn').value=cur.default_rate_note||''; $('e_open').checked=cur.invite_open!==false;
+  const inv = cur.invite_code ? `${crewUrl()}?e=${cur.invite_code}` : '(zapisz event, żeby wygenerować)';
+  $('e_invite').textContent=inv;
+  $('e_invCopy').onclick=()=>{ navigator.clipboard.writeText(inv); toast('Link skopiowany'); };
+  $('e_invMsg').onclick=()=>{ navigator.clipboard.writeText(`Cześć! Tu Tomek z Pimp My Bar. Szukam ekipy na: ${cur.name} — ${cur.event_date}, ${cur.start_time||''}–${cur.end_time||''}, ${cur.venue||''}. Kliknij, wpisz swój numer i zobacz warunki + potwierdź: ${inv}`); toast('Wiadomość skopiowana'); };
+  $('e_guests').value=cur.guests??''; $('e_bart').value=cur.bartenders_needed??''; $('e_help').value=cur.helpers_needed??''; $('e_summary').value=cur.summary||'';
+  // agenda
+  $('g_place').value=cur.meeting_place||''; $('g_time').value=cur.meeting_time||''; $('g_dress').value=cur.dress_code||''; $('g_pack').value=cur.packing_list||'';
+  $('g_cash').checked=!!cur.cash_needed; $('g_cashnote').value=cur.cash_note||''; $('g_cname').value=cur.contact_name||'Tomek'; $('g_cphone').value=cur.contact_phone||'';
+  $('h_type').value=cur.service_type||''; $('h_paytype').value=cur.payment_type||''; $('h_modules').value=cur.modules||''; $('h_contract').value=cur.contract_url||'';
+  $('h_orgphone').value=cur.organizer_phone||''; $('h_km').value=cur.distance_km??''; $('h_tolls').value=cur.tolls||''; $('h_travel').value=cur.travel_time||''; $('h_depart').value=cur.departure_time||''; $('h_welcome').value=cur.welcome_drinks||'';
+  $('e_contractBtn').classList.toggle('hidden', !cur.contract_url); $('e_contractBtn').href=cur.contract_url||'#';
+  const PAGE_BASE=location.protocol==='file:'?'https://pimpmybar.github.io/pmb-crew/':''; $('e_agendaBtn').href=PAGE_BASE+'agenda.html?id='+cur.id; $('e_menuBtn').href=PAGE_BASE+'menu.html?id='+cur.id;
+  $('g_transport').value=cur.transport||''; $('g_schedule').value=cur.schedule||''; $('g_vehicle').value=cur.vehicle||''; $('g_branding').value=cur.branding||''; $('g_menu').value=cur.menu||''; $('g_notes').value=cur.notes||''; $('g_pub').checked=!!cur.agenda_published;
+  $('a_result').classList.add('hidden');
+  await Promise.all([loadAsgs(), loadUpdates()]);
+}
+$('newEvent').onclick = async()=>{
+  const name = prompt('Nazwa eventu:'); if(!name) return;
+  const date = prompt('Data (RRRR-MM-DD):', new Date().toISOString().slice(0,10)); if(!date) return;
+  const [e] = await api('POST','events',{name,event_date:date,contact_name:'Tomek'});
+  await loadEvents(); openEvent(e.id);
+  document.querySelector('#evPane .tabs button[data-s=edit]').click();
+};
+$('e_save').onclick = async()=>{
+  const n = v => v===''?null:Number(v);
+  const body={name:$('e_name').value,client:$('e_client').value,event_date:$('e_date').value,start_time:$('e_start').value,end_time:$('e_end').value,status:$('e_status').value,
+    venue:$('e_venue').value,address:$('e_address').value,map_url:$('e_map').value,venue_url:$('e_vurl').value,payment_info:$('e_pay').value,travel_note:$('e_travel').value,default_rate_bartender:n($('e_drb').value),default_rate_helper:n($('e_drh').value),default_rate_note:$('e_drn').value,invite_open:$('e_open').checked,guests:n($('e_guests').value),bartenders_needed:n($('e_bart').value),helpers_needed:n($('e_help').value),summary:$('e_summary').value};
+  await api('PATCH',`events?id=eq.${cur.id}`,body); toast('Zapisano'); await loadEvents(); openEvent(cur.id);
+};
+$('e_del').onclick = async()=>{ if(!confirm('Usunąć event razem z przypisaniami?')) return; await api('DELETE',`events?id=eq.${cur.id}`,null,'return=minimal'); cur=null; $('evPane').classList.add('hidden'); loadEvents(); };
+
+$('g_save').onclick = async()=>{
+  const body={meeting_place:$('g_place').value,meeting_time:$('g_time').value,dress_code:$('g_dress').value,packing_list:$('g_pack').value,cash_needed:$('g_cash').checked,cash_note:$('g_cashnote').value,
+    contact_name:$('g_cname').value,contact_phone:$('g_cphone').value,transport:$('g_transport').value,schedule:$('g_schedule').value,vehicle:$('g_vehicle').value,branding:$('g_branding').value,menu:$('g_menu').value,notes:$('g_notes').value,agenda_published:$('g_pub').checked,
+    agenda_version:(cur.agenda_version||0)+1};
+  await api('PATCH',`events?id=eq.${cur.id}`,body); toast('Agenda zapisana'); await loadEvents(); cur=events.find(e=>e.id===cur.id);
+  $('g_msg').textContent = $('g_pub').checked ? 'Opublikowana — skład zobaczy zmiany z plakietką NOWE.' : 'Zapisana, ale NIEopublikowana — zaznacz „Agenda opublikowana”, żeby skład ją widział.';
+};
+
+$('h_save').onclick = async()=>{
+  const body={service_type:$('h_type').value,payment_type:$('h_paytype').value,modules:$('h_modules').value,contract_url:$('h_contract').value.trim()||null,organizer_phone:$('h_orgphone').value,
+    distance_km:$('h_km').value===''?null:Number($('h_km').value),tolls:$('h_tolls').value,travel_time:$('h_travel').value,departure_time:$('h_depart').value,welcome_drinks:$('h_welcome').value};
+  await api('PATCH',`events?id=eq.${cur.id}`,body); toast('Zapisano'); await loadEvents(); cur=events.find(e=>e.id===cur.id); $('e_contractBtn').classList.toggle('hidden', !cur.contract_url); $('e_contractBtn').href=cur.contract_url||'#';
+};
+
+/* ---------- UPDATES ---------- */
+async function loadUpdates(){
+  const ups = await api('GET',`updates?event_id=eq.${cur.id}&order=created_at.desc`);
+  $('u_list').innerHTML = ups.map(u=>`<div style="padding:6px 0;border-top:1px solid var(--line)"><span class="muted">${new Date(u.created_at).toLocaleString('pl-PL')}</span> — ${esc(u.message)}</div>`).join('');
+}
+$('u_send').onclick = async()=>{
+  const m=$('u_msg').value.trim(); if(!m) return;
+  await api('POST','updates',{event_id:cur.id,message:m}); $('u_msg').value=''; toast('Zapisano aktualizację'); loadUpdates();
+};
+$('u_copy').onclick = ()=>{ const m=$('u_msg').value.trim(); navigator.clipboard.writeText(`${cur.name}: ${m||'aktualizacja w agendzie'} — sprawdźcie swoje linki.`); toast('Skopiowano'); };
+
+/* ---------- ASSIGNMENTS ---------- */
+const ASG = {wyslany:['Wysłany',''],otwarty:['Otworzył, nie odpowiedział','warn'],zaakceptowany:['Zaakceptował','ok'],odrzucony:['Odrzucił','bad']};
+function linkFor(a){ return `${crewUrl()}?t=${a.token}`; }
+function waMsg(a){
+  const c=a.crew||{}; const hi = c.first_name?`Cześć ${c.first_name}!`:'Cześć!';
+  return `${hi} Tu Tomek z Pimp My Bar. ${cur.name} — ${cur.event_date}, ${cur.start_time||''}–${cur.end_time||''}. Rola: ${a.role}, stawka ${money(a.rate_amount)}${a.rate_unit==='godzina'?'/h':''}${a.rate_note?' ('+a.rate_note+')':''}. Szczegóły i potwierdzenie pod Twoim linkiem: ${linkFor(a)}`;
+}
+async function loadAsgs(){
+  asgs = await api('GET',`assignments?select=*,crew(*)&event_id=eq.${cur.id}&order=created_at`);
+  const acc=asgs.filter(a=>a.status==='zaakceptowany');
+  $('stat').innerHTML = `<div><b>${acc.filter(a=>a.role==='barman').length}/${cur.bartenders_needed||0}</b>barmanów</div><div><b>${acc.filter(a=>a.role==='pomocnik').length}/${cur.helpers_needed||0}</b>pomocników</div><div><b>${asgs.filter(a=>a.status==='wyslany').length}</b>nie otworzyło</div><div><b>${asgs.filter(a=>a.status==='otwarty').length}</b>bez odpowiedzi</div><div><b>${asgs.filter(a=>a.status==='odrzucony').length}</b>odrzuciło</div>`;
+  $('asgBody').innerHTML = asgs.map(a=>{const c=a.crew||{}; const s=ASG[a.status]||[a.status,''];
+    return `<tr><td><b>${esc([c.first_name,c.last_name].filter(Boolean).join(' ')||'(bez imienia)')}</b><br><span class="muted mono">${esc(c.phone)}</span></td>
+    <td>${a.role}</td><td>${money(a.rate_amount)}${a.rate_unit==='godzina'?'/h':''}<br><span class="muted">${esc(a.rate_note||'')}</span></td>
+    <td><span class="pill ${s[1]}">${s[0]}</span>${a.counter_offer?`<br><span class="muted">chce: ${esc(a.counter_offer)}</span>`:''}${a.status==='zaakceptowany'&&cur.agenda_published&&(a.seen_agenda_version||0)<(cur.agenda_version||0)?'<br><span class="pill info">nie widział agendy</span>':''}</td>
+    <td><button class="btn sm" data-copy="${a.id}">Kopiuj link</button> <a class="btn sm" target="_blank" href="https://wa.me/${esc((c.phone||'').replace(/\D/g,''))}?text=${encodeURIComponent(waMsg(a))}">WA</a></td>
+    <td class="right"><button class="btn sm" data-rate="${a.id}">Stawka</button> <button class="btn sm danger" data-del="${a.id}">✕</button></td></tr>`;}).join('') || '<tr><td colspan="6" class="muted">Nikogo jeszcze nie dodałeś.</td></tr>';
+  $('asgBody').querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{ navigator.clipboard.writeText(linkFor(asgs.find(a=>a.id===b.dataset.copy))); toast('Link skopiowany'); });
+  $('asgBody').querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(!confirm('Usunąć z eventu? Link przestanie działać.')) return; await api('DELETE',`assignments?id=eq.${b.dataset.del}`,null,'return=minimal'); loadAsgs(); });
+  $('asgBody').querySelectorAll('[data-rate]').forEach(b=>b.onclick=async()=>{ const a=asgs.find(x=>x.id===b.dataset.rate); const v=prompt('Nowa stawka (zł):',a.rate_amount??''); if(v===null) return; const note=prompt('Dopisek:',a.rate_note||''); await api('PATCH',`assignments?id=eq.${a.id}`,{rate_amount:v===''?null:Number(v),rate_note:note}); loadAsgs(); });
+  // datalist
+  $('phoneList').innerHTML = people.map(p=>`<option value="${esc(p.phone)}">${esc([p.first_name,p.last_name].filter(Boolean).join(' '))}</option>`).join('');
+}
+$('a_add').onclick = async()=>{
+  const phoneRaw=$('a_phone').value.trim(); if(!phoneRaw){ $('a_msg').textContent='Podaj telefon.'; return; }
+  let phone=phoneRaw.replace(/[\s-]/g,''); if(/^\d{9}$/.test(phone)) phone='+48'+phone; if(/^48\d{9}$/.test(phone)) phone='+'+phone;
+  $('a_add').disabled=true; $('a_msg').textContent='';
+  try{
+    let person = people.find(p=>p.phone===phone);
+    if(!person){ [person] = await api('POST','crew',{phone,first_name:$('a_first').value.trim()||null,default_role:$('a_role').value}); people.push(person); }
+    else if($('a_first').value.trim() && !person.first_name){ await api('PATCH',`crew?id=eq.${person.id}`,{first_name:$('a_first').value.trim()}); person.first_name=$('a_first').value.trim(); }
+    const rate=$('a_rate').value;
+    const [a] = await api('POST','assignments?select=*,crew(*)',{event_id:cur.id,crew_id:person.id,role:$('a_role').value,rate_amount:rate===''?null:Number(rate),rate_unit:$('a_unit').value,rate_note:$('a_note').value.trim()||null});
+    $('a_result').classList.remove('hidden'); $('a_link').textContent=linkFor(a);
+    $('a_copy').onclick=()=>{navigator.clipboard.writeText(linkFor(a)); toast('Link skopiowany');};
+    $('a_copyMsg').onclick=()=>{navigator.clipboard.writeText(waMsg(a)); toast('Wiadomość skopiowana');};
+    $('a_wa').href=`https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent(waMsg(a))}`;
+    $('a_phone').value=''; $('a_first').value=''; loadAsgs();
+  } catch(e){ $('a_msg').textContent = /duplicate|unique/i.test(e.message)?'Ta osoba jest już na tym evencie.':'Błąd: '+e.message; }
+  finally{ $('a_add').disabled=false; }
+};
+
+/* ---------- CATALOG / QUANTITIES ---------- */
+let CAT=[];
+async function loadCatalog(){ CAT = await api('GET','catalog?select=*&active=eq.true&order=category,sort,name'); $('catList').innerHTML=[...new Set(CAT.map(c=>c.category))].map(c=>`<option value="${esc(c)}">`).join(''); }
+function fmtN(n){ return n==null?'':Number(n).toLocaleString('pl-PL',{maximumFractionDigits:2}); }
+function renderGrid(){
+  const q=$('q_search').value.toLowerCase(), only=$('q_onlyFilled').checked;
+  const byCat={}; CAT.forEach(c=>{ const it=PK.find(p=>p.catalog_id===c.id); if(only && !(it&&(it.qty_num!=null||it.note))) return; if(q && !c.name.toLowerCase().includes(q)) return; (byCat[c.category]=byCat[c.category]||[]).push({c,it}); });
+  $('q_grid').innerHTML = Object.keys(byCat).map(cat=>`<h2 style="margin:14px 0 4px;color:var(--acc)">${esc(cat)}</h2><table><thead><tr><th>Pozycja</th><th style="width:70px">Jedn.</th><th style="width:110px">Ilość</th><th style="width:140px">Uwagi</th><th style="width:80px" class="right">Stan</th></tr></thead><tbody>${byCat[cat].map(({c,it})=>`<tr><td>${esc(c.name)}</td><td class="muted">${esc(c.unit||'')}</td><td><input type="number" step="any" data-q="${c.id}" value="${it&&it.qty_num!=null?it.qty_num:''}" style="padding:5px 8px"></td><td><input data-n="${c.id}" value="${esc(it&&it.note||'')}" placeholder="KOSZ / KLIENT" style="padding:5px 8px"></td><td class="right muted">${fmtN(c.stock)}</td></tr>`).join('')}</tbody></table>`).join('') || '<p class="muted">Brak pozycji.</p>';
+  const save = async(id)=>{ const c=CAT.find(x=>x.id===id); const qv=$('q_grid').querySelector(`[data-q="${id}"]`).value, nv=$('q_grid').querySelector(`[data-n="${id}"]`).value.trim();
+    const it=PK.find(p=>p.catalog_id===id); const body={event_id:cur.id,catalog_id:id,category:c.category,name:c.name,unit:c.unit,sort:c.sort,qty_num:qv===''?null:Number(qv),note:nv||null};
+    if(it){ await api('PATCH',`packing_items?id=eq.${it.id}`,body,'return=minimal'); Object.assign(it,body); }
+    else if(qv!==''||nv){ const [row]=await api('POST','packing_items',body); PK.push(row); }
+    toast('Zapisano'); };
+  $('q_grid').querySelectorAll('[data-q]').forEach(i=>i.onchange=()=>save(i.dataset.q));
+  $('q_grid').querySelectorAll('[data-n]').forEach(i=>i.onchange=()=>save(i.dataset.n));
+}
+$('q_search').oninput=renderGrid; $('q_onlyFilled').onchange=renderGrid;
+$('q_add').onclick=async()=>{ const cat=$('q_cat').value.trim().toUpperCase(), name=$('q_name').value.trim(); if(!cat||!name){ toast('Podaj kategorię i nazwę'); return; }
+  const stock=$('q_stock').value; const sort=(CAT.filter(c=>c.category===cat).length||0)+1;
+  await api('POST','catalog',{category:cat,name,unit:$('q_unit').value,sort,stock:stock===''?null:Number(stock),stock_updated_at:stock===''?null:new Date().toISOString()},'return=minimal');
+  $('q_name').value=''; $('q_stock').value=''; await loadCatalog(); renderGrid(); toast('Dodano do katalogu'); };
+
+/* ---------- PACKING ---------- */
+let PK=[];
+async function loadPack(){
+  if(!CAT.length) await loadCatalog();
+  PK = await api('GET',`packing_items?select=*,crew(first_name)&event_id=eq.${cur.id}&order=category,sort,created_at`);
+  renderGrid();
+  const done=PK.filter(p=>p.packed_at).length;
+  $('pk_stat').innerHTML = `<div><b>${done}/${PK.length}</b>zapakowane</div><div><b>${PK.length-done}</b>zostało</div>`;
+  const PKV=PK.filter(p=>p.qty_num!=null||p.qty||p.note);
+  const cats=[...new Set(PKV.map(p=>p.category))];
+  $('pk_list').innerHTML = cats.map(c=>`<h2 style="margin:14px 0 4px;color:var(--acc)">${esc(c)}</h2><table>${PKV.filter(p=>p.category===c).map(p=>`<tr><td style="width:28px"><input type="checkbox" data-pk="${p.id}" ${p.packed_at?'checked':''}></td><td ${p.packed_at?'class="muted"':''}>${esc(p.name)}</td><td class="mono" style="width:110px">${esc(p.qty||(p.qty_num!=null?fmtN(p.qty_num)+' '+(p.unit||''):''))}${p.note?' · '+esc(p.note):''}</td><td class="muted" style="width:160px">${p.packed_at?esc((p.crew||{}).first_name||'')+' · '+new Date(p.packed_at).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}):''}</td><td class="right" style="width:70px"><button class="btn sm" data-pke="${p.id}">✎</button> <button class="btn sm danger" data-pkd="${p.id}">✕</button></td></tr>`).join('')}</table>`).join('') || '<p class="muted">Lista pusta — dodaj pozycje poniżej.</p>';
+  $('pk_list').querySelectorAll('[data-pk]').forEach(cb=>cb.onchange=async()=>{ await api('PATCH',`packing_items?id=eq.${cb.dataset.pk}`,{packed_at:cb.checked?new Date().toISOString():null,packed_by:null}); loadPack(); });
+  $('pk_list').querySelectorAll('[data-pkd]').forEach(b=>b.onclick=async()=>{ await api('DELETE',`packing_items?id=eq.${b.dataset.pkd}`,null,'return=minimal'); loadPack(); });
+  $('pk_list').querySelectorAll('[data-pke]').forEach(b=>b.onclick=async()=>{ const it=PK.find(p=>p.id===b.dataset.pke); const name=prompt('Nazwa:',it.name); if(name===null) return; const qty=prompt('Ilość:',it.qty||''); if(qty===null) return; await api('PATCH',`packing_items?id=eq.${it.id}`,{name,qty}); loadPack(); });
+}
+$('pk_refresh').onclick=loadPack;
+$('pk_reset').onclick=async()=>{ if(!confirm('Odznaczyć wszystko?')) return; await api('PATCH',`packing_items?event_id=eq.${cur.id}`,{packed_at:null,packed_by:null}); loadPack(); };
+$('pk_clear').onclick=async()=>{ if(!confirm('Usunąć całą listę pakowania tego eventu?')) return; await api('DELETE',`packing_items?event_id=eq.${cur.id}`,null,'return=minimal'); loadPack(); };
+$('pk_add').onclick=async()=>{
+  const lines=$('pk_bulk').value.split('\n').map(l=>l.trim()).filter(Boolean); let cat='INNE', rows=[], i=0;
+  for(const l of lines){ if(l.startsWith('#')){ cat=l.replace(/^#+\s*/,'').toUpperCase()||'INNE'; continue; } const [name,qty]=l.split('|').map(x=>x.trim()); if(name) rows.push({event_id:cur.id,category:cat,name,qty:qty||null,sort:++i}); }
+  if(!rows.length){ $('pk_msg').textContent='Nic do dodania.'; return; }
+  await api('POST','packing_items',rows,'return=minimal'); $('pk_bulk').value=''; $('pk_msg').textContent=`Dodano ${rows.length} pozycji.`; loadPack();
+};
+$('pk_tpl').onclick=()=>{ $('pk_bulk').value=`# CHECK LIST
+Koszule / fartuchy | wg składu
+Śrubki do baru | ?
+Kuwety do baru | ?
+Speedrack | ?
+Menu wydrukowane | ?
+Squizery | ?
+Wizytówki / ulotki | KOSZ
+Butelki do wody z korkiem | ?
+Kosz ze sprzętem | 1
+Blender | ?
+Ręcznik papierowy | KOSZ
+Worki na śmieci | KOSZ
+Puste butelki do syropu | ?
+Puste butelki do soków | ?
+Colemany | ?
+Przedłużacz / przejściówka 230 V | ?
+# LÓD
+Lód w kostkach | ? kg
+# DODATKI
+Rurki (paczka = 100 szt.) | ?
+Serwetki koktajlowe | ?
+Mieszadełka | ?`; };
+
+/* ---------- PEOPLE ---------- */
+async function loadPeople(){
+  people = await api('GET','crew?select=*,assignments(status)&order=first_name');
+  renderPeople();
+}
+function renderPeople(){
+  const q=$('p_search').value.toLowerCase();
+  const f=(document.querySelector('#p_filter .on')||{}).dataset?.f||'';
+  const list=people.filter(p=>(!f||(p.status||'nowy')===f)&&(!q||JSON.stringify(p).toLowerCase().includes(q)));
+  $('peopleBody').innerHTML = list.map(p=>`<tr class="click" data-id="${p.id}"><td><b>${esc([p.first_name,p.last_name].filter(Boolean).join(' ')||'(bez imienia)')}</b>${p.terms_accepted_at?'':' <span class="pill warn" title="nie zaakceptował warunków">bez warunków</span>'}</td><td><span class="pill ${ {nowy:'info',aktywny:'ok',rezerwa:'',nieaktywny:'bad'}[p.status||'nowy'] }">${esc(p.status||'nowy')}</span></td><td class="mono">${esc(p.phone)}</td><td>${esc(p.city||'')}</td><td>${p.driving_license==null?'—':p.driving_license?'tak':'nie'}</td><td>${p.has_car==null?'—':p.has_car?'tak':'nie'}</td><td>${esc(p.shirt_size||'')}</td><td>${p.student==null?'—':p.student?'tak':'nie'}</td><td>${(p.assignments||[]).filter(a=>a.status==='zaakceptowany').length}</td><td class="muted">${esc(p.experience||'')}</td></tr>`).join('') || '<tr><td colspan="10" class="muted">Pusto.</td></tr>';
+  $('peopleBody').querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>editPerson(tr.dataset.id));
+}
+$('p_search').oninput=renderPeople;
+document.querySelectorAll('#p_filter button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#p_filter button').forEach(x=>x.classList.toggle('on',x===b)); renderPeople(); });
+function editPerson(id){
+  curPerson=people.find(p=>p.id===id); const p=curPerson; $('personCard').classList.remove('hidden');
+  $('pe_first').value=p.first_name||''; $('pe_last').value=p.last_name||''; $('pe_phone').value=p.phone||''; $('pe_email').value=p.email||''; $('pe_city').value=p.city||'';
+  $('pe_size').value=p.shirt_size||''; $('pe_role').value=p.default_role||'barman'; $('pe_rating').value=p.rating??''; $('pe_exp').value=p.experience||''; $('pe_lic').value=p.driving_license==null?'':String(p.driving_license); $('pe_car').value=p.has_car==null?'':String(p.has_car); $('pe_notes').value=p.notes||''; $('pe_active').checked=p.active!==false; $('pe_status').value=p.status||'nowy'; $('pe_terms').value=p.terms_accepted_at?new Date(p.terms_accepted_at).toLocaleString('pl-PL'):'—';
+  $('pe_mylink').value=p.my_token?`${crewUrl()}?m=${p.my_token}`:'uruchom update15.sql w Supabase';
+  $('pe_mycopy').onclick=()=>{ if(p.my_token){ navigator.clipboard.writeText($('pe_mylink').value); toast('Link skopiowany'); } };
+  $('personCard').scrollIntoView({behavior:'smooth'});
+}
+$('pe_save').onclick=async()=>{
+  const body={first_name:$('pe_first').value,last_name:$('pe_last').value,phone:$('pe_phone').value,email:$('pe_email').value,city:$('pe_city').value,shirt_size:$('pe_size').value,default_role:$('pe_role').value,rating:$('pe_rating').value===''?null:Number($('pe_rating').value),experience:$('pe_exp').value,driving_license:$('pe_lic').value===''?null:$('pe_lic').value==='true',has_car:$('pe_car').value===''?null:$('pe_car').value==='true',notes:$('pe_notes').value,active:$('pe_active').checked,status:$('pe_status').value};
+  await api('PATCH',`crew?id=eq.${curPerson.id}`,body); toast('Zapisano'); loadPeople();
+};
+
+/* ---------- ZAKUPY ---------- */
+let SHOP={events:[],items:[],rows:[]};
+function isoMonday(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); return x.toISOString().slice(0,10); }
+async function loadShop(){
+  if(!CAT.length) await loadCatalog();
+  if(!$('s_from').value){ const m=isoMonday(new Date()); $('s_from').value=m; const t=new Date(m); t.setDate(t.getDate()+13); $('s_to').value=t.toISOString().slice(0,10); }
+  await runShop(); loadSnaps();
+}
+async function runShop(){
+  const f=$('s_from').value, t=$('s_to').value; if(!f||!t) return;
+  SHOP.events = await api('GET',`events?select=id,name,event_date,status&event_date=gte.${f}&event_date=lte.${t}&status=in.(wstepny,potwierdzony)&order=event_date`);
+  const ids=SHOP.events.map(e=>e.id);
+  SHOP.items = ids.length ? await api('GET',`packing_items?select=event_id,catalog_id,qty_num,note&event_id=in.(${ids.join(',')})&qty_num=not.is.null`) : [];
+  $('s_events').textContent = SHOP.events.length ? 'Eventy: '+SHOP.events.map(e=>`${e.name} (${e.event_date})`).join(' · ') : 'Brak eventów w tym zakresie.';
+  renderShop();
+}
+function renderShop(){
+  const only=$('s_onlyOrder').checked; const evs=SHOP.events;
+  SHOP.rows = CAT.map(c=>{ const per=evs.map(e=>SHOP.items.filter(i=>i.event_id===e.id&&i.catalog_id===c.id).reduce((a,i)=>a+Number(i.qty_num||0),0)); const need=per.reduce((a,b)=>a+b,0); const stock=c.stock==null?0:Number(c.stock); return {c,per,need,stock,order:Math.max(need-stock,0)}; })
+    .filter(r=>r.need>0 || (!only && r.stock>0)).filter(r=>!only || r.order>0);
+  let cat=null, html=`<table><thead><tr><th>Pozycja</th><th>Jedn.</th>${evs.map(e=>`<th title="${esc(e.name)}">${esc(e.name.slice(0,14))}<br><span class="muted">${e.event_date.slice(5)}</span></th>`).join('')}<th class="right">Razem</th><th class="right" style="width:90px">Stan</th><th class="right">Do zamówienia</th></tr></thead><tbody>`;
+  SHOP.rows.forEach(r=>{ if(r.c.category!==cat){ cat=r.c.category; html+=`<tr><td colspan="${evs.length+5}" style="color:var(--acc);font-weight:700;padding-top:12px">${esc(cat)}</td></tr>`; }
+    html+=`<tr><td>${esc(r.c.name)}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="right muted">${v?fmtN(v):''}</td>`).join('')}<td class="right"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right"></td><td class="right" style="color:${r.order>0?'var(--acc)':'var(--muted)'};font-weight:700">${r.order>0?fmtN(r.order):'—'}</td></tr>`; });
+  html+='</tbody></table>'; $('s_table').innerHTML = SHOP.rows.length? html : '<p class="muted">Nic do zamówienia.</p>';
+  $('s_table').querySelectorAll('[data-stock]').forEach(i=>i.onchange=async()=>{ const c=CAT.find(x=>x.id===i.dataset.stock); c.stock=i.value===''?null:Number(i.value); await api('PATCH',`catalog?id=eq.${c.id}`,{stock:c.stock,stock_updated_at:new Date().toISOString()},'return=minimal'); renderShop(); toast('Stan zapisany'); });
+}
+$('s_run').onclick=runShop; $('s_onlyOrder').onchange=renderShop;
+$('s_copy').onclick=()=>{ const lines=[]; let cat=null; SHOP.rows.filter(r=>r.order>0).forEach(r=>{ if(r.c.category!==cat){cat=r.c.category; lines.push('\n'+cat);} lines.push(`${r.c.name} — ${fmtN(r.order)} ${r.c.unit||''}`); }); navigator.clipboard.writeText(`ZAMÓWIENIE PMB ${$('s_from').value} – ${$('s_to').value}${lines.join('\n')}`); toast('Skopiowano'); };
+$('s_csv').onclick=()=>{ const evs=SHOP.events; const head=['Kategoria','Pozycja','Jedn.',...evs.map(e=>e.name),'Razem','Stan','Do zamówienia']; const rows=SHOP.rows.map(r=>[r.c.category,r.c.name,r.c.unit||'',...r.per,r.need,r.stock,r.order]); navigator.clipboard.writeText([head,...rows].map(r=>r.map(x=>`"${String(x??'').replace(/"/g,'""')}"`).join(';')).join('\n')); toast('CSV skopiowany'); };
+
+/* ---------- REMANENTY ---------- */
+async function loadSnaps(){
+  try{
+    const snaps = await api('GET','remanenty?select=id,created_at,note&order=created_at.desc&limit=40');
+    $('s_snaps').innerHTML = snaps.length ? snaps.map(sn=>`<button class="btn sm" data-snap="${sn.id}" style="margin:0 6px 6px 0">${new Date(sn.created_at).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}${sn.note?' · '+esc(sn.note):''}</button>`).join('') : 'Brak zapisanych remanentów. Kliknij „Zapisz remanent”, żeby zrobić pierwszy.';
+    $('s_snaps').querySelectorAll('[data-snap]').forEach(b=>b.onclick=()=>showSnap(b.dataset.snap));
+  }catch(e){ $('s_snaps').textContent='Uruchom update14.sql w Supabase, żeby włączyć historię remanentów.'; }
+}
+async function showSnap(id){
+  const [sn] = await api('GET',`remanenty?id=eq.${id}&select=*`);
+  const cur={}; CAT.forEach(c=>cur[c.id]=c.stock==null?null:Number(c.stock));
+  let cat=null, html=`<p class="muted" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">Remanent z ${new Date(sn.created_at).toLocaleString('pl-PL')}${sn.note?' — '+esc(sn.note):''} · porównanie z aktualnym stanem <button class="btn sm danger" id="s_snapDel">Usuń</button></p><table><thead><tr><th>Pozycja</th><th style="width:60px">Jedn.</th><th class="right" style="width:90px">Wtedy</th><th class="right" style="width:90px">Teraz</th><th class="right" style="width:90px">Różnica</th></tr></thead><tbody>`;
+  (sn.items||[]).forEach(it=>{ const then=it.stock==null?null:Number(it.stock); const now=cur[it.id]??null; if(then==null&&now==null) return;
+    if(it.category!==cat){cat=it.category; html+=`<tr><td colspan="5" style="color:var(--acc);font-weight:700;padding-top:10px">${esc(cat)}</td></tr>`;}
+    const d=(now??0)-(then??0);
+    html+=`<tr><td>${esc(it.name)}</td><td class="muted">${esc(it.unit||'')}</td><td class="right muted">${then==null?'—':fmtN(then)}</td><td class="right">${now==null?'—':fmtN(now)}</td><td class="right" style="font-weight:600;color:${d>0?'var(--ok)':d<0?'var(--bad)':'var(--muted)'}">${d>0?'+':''}${d===0?'0':fmtN(d)}</td></tr>`; });
+  html+='</tbody></table>';
+  $('s_snapView').innerHTML=html;
+  $('s_snapDel').onclick=async()=>{ if(!confirm('Usunąć ten remanent z historii?')) return; await api('DELETE',`remanenty?id=eq.${id}`,null,'return=minimal'); $('s_snapView').innerHTML=''; loadSnaps(); toast('Usunięto'); };
+}
+$('s_snap').onclick=async()=>{
+  const note=prompt('Nazwa remanentu (np. „po weekendzie 5–6.09” albo „przed zakupami”):',''); if(note===null) return;
+  if(!CAT.length) await loadCatalog();
+  const items=CAT.map(c=>({id:c.id,category:c.category,name:c.name,unit:c.unit||'',stock:c.stock??null}));
+  await api('POST','remanenty',{note:note.trim()||null,items},'return=minimal');
+  toast('Remanent zapisany'); loadSnaps();
+};
+$('s_clear').onclick=async()=>{
+  if(!confirm('Wyzerować stan magazynu dla wszystkich pozycji?\n\nJeśli chcesz zachować obecny stan w historii, najpierw kliknij „Zapisz remanent”.')) return;
+  await api('PATCH','catalog?stock=not.is.null',{stock:null,stock_updated_at:new Date().toISOString()},'return=minimal');
+  await loadCatalog(); renderShop(); toast('Stan magazynu wyczyszczony');
+};
+
+/* ---------- MOTYW ---------- */
+if(localStorage.getItem('pmb_theme')==='light') document.documentElement.classList.add('light');
+$('themeBtn').onclick=()=>{ const l=document.documentElement.classList.toggle('light'); localStorage.setItem('pmb_theme', l?'light':'dark'); };
+
+/* ---------- MENU / RECEPTURY ---------- */
+let RCP=[], curR=null;
+async function loadRecipes(){
+  try{ RCP = await api('GET','recipes?select=*&order=category,sort,name'); }
+  catch(e){ $('r_list').textContent='Uruchom update17.sql w Supabase, żeby włączyć bibliotekę menu.'; return; }
+  $('r_cats').innerHTML=[...new Set(RCP.map(r=>r.category))].map(c=>`<option value="${esc(c)}">`).join('');
+  renderRecipes();
+}
+function renderRecipes(){
+  const q=($('r_search').value||'').toLowerCase();
+  const rows=RCP.filter(r=>!q||(r.name+' '+(r.ing_short||'')+' '+(r.recipe||'')+' '+(r.aliases||'')).toLowerCase().includes(q));
+  let cat=null, html='';
+  rows.forEach(r=>{ if(r.category!==cat){cat=r.category; html+=`<h2 style="margin:12px 0 4px;color:var(--acc)">${esc(cat)}</h2>`;}
+    html+=`<div class="evitem ${curR&&curR.id===r.id?'on':''}" data-r="${r.id}" style="padding:8px 10px;margin-bottom:4px;${r.active===false?'opacity:.5':''}"><b style="font-size:14px">${esc(r.name)}${r.is_mock?' <span class="pill">0%</span>':''}</b><small>${esc(r.ing_short||'')}</small></div>`; });
+  $('r_list').innerHTML=html||'<p class="muted">Brak pozycji.</p>';
+  $('r_list').querySelectorAll('[data-r]').forEach(el=>el.onclick=()=>editRecipe(el.dataset.r));
+}
+function editRecipe(id){
+  curR = id ? RCP.find(r=>r.id===id) : {category:'',sort:0,name:'',aliases:'',ing_short:'',descr:'',recipe:'',glass:'',ice:'',garnish:'',method:'',is_mock:false,active:true};
+  const r=curR; $('r_form').classList.remove('hidden'); $('r_hint').classList.add('hidden');
+  $('r_name').value=r.name||''; $('r_cat').value=r.category||''; $('r_aliases').value=r.aliases||''; $('r_ing').value=r.ing_short||''; $('r_descr').value=r.descr||'';
+  $('r_recipe').value=r.recipe||''; $('r_glass').value=r.glass||''; $('r_ice').value=r.ice||''; $('r_garnish').value=r.garnish||''; $('r_method').value=r.method||'';
+  $('r_mock').checked=!!r.is_mock; $('r_active').checked=r.active!==false; $('r_sort').value=r.sort??0; $('r_del').style.display=r.id?'':'none'; $('r_msg').textContent='';
+  renderRecipes();
+}
+$('r_search').oninput=renderRecipes;
+$('r_new').onclick=()=>editRecipe(null);
+$('r_save').onclick=async()=>{
+  const body={name:$('r_name').value.trim(),category:$('r_cat').value.trim()||'INNE',aliases:$('r_aliases').value.trim()||null,ing_short:$('r_ing').value.trim(),descr:$('r_descr').value.trim(),
+    recipe:$('r_recipe').value.trim(),glass:$('r_glass').value.trim(),ice:$('r_ice').value.trim(),garnish:$('r_garnish').value.trim(),method:$('r_method').value.trim(),
+    is_mock:$('r_mock').checked,active:$('r_active').checked,sort:Number($('r_sort').value||0)};
+  if(!body.name){ $('r_msg').textContent='Podaj nazwę.'; return; }
+  try{ if(curR.id){ await api('PATCH',`recipes?id=eq.${curR.id}`,body,'return=minimal'); } else { const [n]=await api('POST','recipes',body); curR=n; }
+    toast('Zapisano'); await loadRecipes(); if(curR&&curR.id) editRecipe(curR.id); }
+  catch(e){ $('r_msg').textContent='Błąd: '+e.message; }
+};
+$('r_del').onclick=async()=>{ if(!curR||!curR.id) return; if(!confirm('Usunąć „'+curR.name+'” z biblioteki?')) return; await api('DELETE',`recipes?id=eq.${curR.id}`,null,'return=minimal'); curR=null; $('r_form').classList.add('hidden'); $('r_hint').classList.remove('hidden'); toast('Usunięto'); loadRecipes(); };
+
+/* wstawianie z biblioteki do menu eventu */
+$('g_menuPick').onclick=async()=>{ if(!RCP.length) await loadRecipes(); $('g_menuPicker').classList.toggle('hidden'); renderMenuPicker(); };
+$('g_menuClose').onclick=()=>$('g_menuPicker').classList.add('hidden');
+$('g_menuSearch').oninput=()=>renderMenuPicker();
+function renderMenuPicker(){
+  const q=($('g_menuSearch').value||'').toLowerCase(); let cat=null, html='';
+  RCP.filter(r=>r.active!==false&&(!q||r.name.toLowerCase().includes(q))).forEach(r=>{ if(r.category!==cat){cat=r.category; html+=`<div style="break-inside:avoid;font-size:11px;color:var(--acc);font-weight:700;margin:8px 0 3px">${esc(cat)}</div>`;}
+    html+=`<label class="check" style="margin:2px 0;break-inside:avoid;font-size:13px"><input type="checkbox" data-pick="${r.id}"> ${esc(r.name)}</label>`; });
+  $('g_menuList').innerHTML=html;
+}
+$('g_menuInsert').onclick=()=>{
+  const ids=[...$('g_menuList').querySelectorAll('[data-pick]:checked')].map(c=>c.dataset.pick); if(!ids.length) return;
+  const lines=ids.map(id=>{ const r=RCP.find(x=>x.id===id); return `${r.name} — ${r.recipe||r.ing_short||''}`; });
+  const ta=$('g_menu'); ta.value=(ta.value.trim()?ta.value.replace(/\s+$/,'')+'\n':'')+lines.join('\n'); $('g_menuPicker').classList.add('hidden'); toast(ids.length+' pozycji wstawiono — pamiętaj Zapisz');
+};
+
+/* ---------- SETTINGS ---------- */
+$('set_save').onclick=()=>{ localStorage.setItem('pmb_crew_url',$('set_url').value.trim()); toast('Zapisano'); loadSettings(); };
+async function loadSettings(){
+  const rows = await api('GET','settings?select=*'); const S={}; rows.forEach(r=>S[r.key]=r.value);
+  $('set_terms').value=S.terms||''; $('set_wh').value=S.warehouse||''; $('set_recruitOpen').checked=(S.recruit_open||'true')==='true';
+  const link=`${crewUrl()}?r=1`; $('set_recruit').textContent=link;
+  $('set_recruitCopy').onclick=()=>{ navigator.clipboard.writeText(link); toast('Link skopiowany'); };
+}
+async function saveSetting(key,value){ await api('POST','settings',{key,value,updated_at:new Date().toISOString()},'resolution=merge-duplicates,return=minimal'); }
+$('set_saveAll').onclick=async()=>{ await saveSetting('terms',$('set_terms').value); await saveSetting('warehouse',$('set_wh').value); toast('Zapisano'); };
+$('set_recruitOpen').onchange=async()=>{ await saveSetting('recruit_open',$('set_recruitOpen').checked?'true':'false'); toast($('set_recruitOpen').checked?'Nabór otwarty':'Nabór zamknięty'); };
+
+/* ---------- START ---------- */
+async function start(){
+  $('loginView').classList.add('hidden'); $('appView').classList.remove('hidden');
+  $('set_url').value=crewUrl();
+  try { await loadPeople(); await loadEvents(); } catch(e){ alert('Błąd połączenia z bazą: '+e.message); return; }
+  if(events.length) openEvent(events[0].id);
+}
+(async()=>{ if(await ensureSession()) start(); else $('loginView').classList.remove('hidden'); })();
+</script>
+</body>
+</html>

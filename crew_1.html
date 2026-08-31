@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PMB Crew</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0d0f;--card:#17171b;--card2:#1f1f25;--line:#2a2a32;--txt:#f2f0ea;--muted:#9a9aa6;--acc:#e8b04b;--acc2:#c9922e;--ok:#4cc38a;--bad:#e5534b;--r:16px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:560px;margin:0 auto;padding:20px 16px 60px}
+.brand{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.logo{font-family:'Bebas Neue',Inter,sans-serif;font-size:30px;letter-spacing:.06em;line-height:1}
+.logo span{color:var(--acc)}
+.pill{font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px;background:var(--card2);color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.pill.ok{background:rgba(76,195,138,.15);color:var(--ok)}
+.pill.warn{background:rgba(232,176,75,.15);color:var(--acc)}
+.pill.bad{background:rgba(229,83,75,.15);color:var(--bad)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:14px}
+h1{font-family:'Bebas Neue',Inter,sans-serif;font-size:34px;letter-spacing:.03em;margin:0 0 6px;line-height:1.05}
+h2{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px}
+.row{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.row .k{width:110px;flex:none;color:var(--muted);font-size:13px;padding-top:2px}
+.row .v{flex:1;font-size:15px;line-height:1.45}
+.rate{display:flex;align-items:baseline;gap:8px;margin-top:4px}
+.rate b{font-size:30px;font-family:'Bebas Neue',Inter,sans-serif;letter-spacing:.02em;color:var(--acc)}
+.rate small{color:var(--muted);font-size:13px}
+label{display:block;font-size:12px;color:var(--muted);margin:12px 0 6px;font-weight:500}
+input,select,textarea{width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit;font-size:16px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--acc)}
+textarea{min-height:70px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;background:var(--card2);border:1px solid var(--line);color:var(--muted);padding:11px;border-radius:10px;font:inherit;font-size:15px}
+.seg button.on{background:rgba(232,176,75,.12);border-color:var(--acc);color:var(--txt)}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:16px;font:inherit;font-size:16px;font-weight:700;cursor:pointer;margin-top:14px}
+.btn.primary{background:var(--acc);color:#151004}
+.btn.primary:active{background:var(--acc2)}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:500}
+.btn:disabled{opacity:.5}
+.note{font-size:13px;color:var(--muted);line-height:1.5}
+.err{color:var(--bad);font-size:14px;margin-top:10px}
+.big{font-size:17px;line-height:1.5}
+ul.list{margin:0;padding-left:0;list-style:none}
+ul.list li{padding:8px 0 8px 28px;border-top:1px solid var(--line);position:relative;line-height:1.4}
+ul.list li:first-child{border-top:0}
+ul.list li:before{content:"";position:absolute;left:4px;top:13px;width:12px;height:12px;border:2px solid var(--acc);border-radius:4px}
+.upd{padding:10px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.45}
+.upd:first-child{border-top:0}
+.upd time{display:block;font-size:12px;color:var(--muted);margin-bottom:2px}
+.new{display:inline-block;background:var(--acc);color:#151004;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:8px;vertical-align:middle}
+a{color:var(--acc)}
+.links{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.links a{display:inline-block;padding:7px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;text-decoration:none;color:var(--txt);background:var(--card2)}
+.hidden{display:none!important}
+.prog{height:8px;background:var(--card2);border-radius:99px;overflow:hidden;margin:8px 0 4px}
+.prog i{display:block;height:100%;background:var(--ok);border-radius:99px;transition:width .3s}
+.cat{margin-top:14px}
+.cat h3{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);margin:0 0 4px;display:flex;justify-content:space-between}
+.cat h3 span{color:var(--muted);font-weight:500;letter-spacing:0;text-transform:none}
+.pi{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pi .box{width:24px;height:24px;border:2px solid var(--muted);border-radius:7px;flex:none;display:flex;align-items:center;justify-content:center;font-size:15px;color:#151004}
+.pi.done .box{background:var(--ok);border-color:var(--ok)}
+.pi .nm{flex:1;line-height:1.35}
+.pi.done .nm{color:var(--muted);text-decoration:line-through}
+.pi .who{font-size:11px;color:var(--muted);display:block;text-decoration:none}
+.pi .q{font-weight:700;color:var(--acc);white-space:nowrap}
+.pi.done .q{color:var(--muted)}
+.tog{display:flex;gap:6px;margin-top:10px}.tog button{flex:1;background:var(--card2);border:1px solid var(--line);color:var(--muted);padding:9px;border-radius:9px;font:inherit;font-size:13px}.tog button.on{color:var(--txt);border-color:var(--acc)}
+.center{text-align:center;padding:60px 20px}
+.terms{font-size:14px;line-height:1.55;color:var(--txt)}
+.terms h4{margin:14px 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--acc)}
+.terms p{margin:0;padding:5px 0 5px 0;border-top:1px solid var(--line)}
+.terms p:first-of-type{border-top:0}
+.chk{display:flex;gap:12px;align-items:flex-start;margin-top:14px;cursor:pointer}
+.chk input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--acc)}
+.chk span{font-size:15px;line-height:1.4}
+details summary{cursor:pointer;font-size:13px;color:var(--acc);font-weight:600;list-style:none;padding:8px 0}
+details summary::-webkit-details-marker{display:none}
+pre.txt{white-space:pre-wrap;font:inherit;margin:0;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><div class="logo">PIMP MY BAR <span>CREW</span></div><span id="statusPill" class="pill">…</span></div>
+  <a id="myEventsLink" class="btn hidden" style="display:none;margin:-4px 0 12px;text-align:center">📅 Wszystkie moje eventy</a>
+
+  <div id="loading" class="center note">Ładowanie…</div>
+
+  <div id="invalid" class="center hidden">
+    <h1>Link nieaktywny</h1>
+    <p class="note">Ten link nie działa albo wygasł. Napisz do Tomka na WhatsApp.</p>
+  </div>
+
+  <!-- LINK REKRUTACYJNY -->
+  <div id="home" class="hidden">
+    <h1 id="hHello" style="margin:14px 0 4px">Moje eventy</h1>
+    <p class="note" id="hSub" style="margin-top:0">Twoje najbliższe wyjazdy z PMB. Kliknij event, żeby zobaczyć szczegóły i agendę.</p>
+    <div id="hList"></div>
+    <button class="btn" id="hIcs" style="margin-top:14px">📅 Dodaj do kalendarza (.ics)</button>
+    <p class="note" style="margin-top:8px">Plik .ics otwórz na telefonie — eventy dodadzą się do kalendarza Google/Apple.</p>
+  </div>
+
+  <div id="recruit" class="hidden">
+    <div class="card">
+      <h1>Dołącz do ekipy PMB</h1>
+      <p class="big" style="margin:0">Robimy bary na eventach, weselach i imprezach firmowych w całej Polsce. Wypełnij dane raz, przeczytaj warunki — i będziemy Cię zapraszać na konkretne eventy z konkretną stawką.</p>
+    </div>
+    <div class="card">
+      <h2>Twoje dane</h2>
+      <div class="grid2">
+        <div><label>Imię</label><input id="r_first" autocomplete="given-name"></div>
+        <div><label>Nazwisko</label><input id="r_last" autocomplete="family-name"></div>
+      </div>
+      <label>Telefon (WhatsApp)</label><input id="r_phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+48 600 000 000">
+      <label>E-mail</label><input id="r_email" type="email" inputmode="email" autocomplete="email">
+      <div class="grid2">
+        <div><label>Miasto</label><input id="r_city"></div>
+        <div><label>Rozmiar koszulki</label><select id="r_size"><option value="">—</option><option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select></div>
+      </div>
+      <label>Chcesz pracować jako</label>
+      <div class="seg" id="r_role"><button type="button" data-v="barman" class="on">Barman</button><button type="button" data-v="pomocnik">Pomocnik barmana</button></div>
+      <div class="grid2">
+        <div><label>Masz prawo jazdy?</label><div class="seg" id="r_lic"><button type="button" data-v="true">Tak</button><button type="button" data-v="false">Nie</button></div></div>
+        <div><label>Masz swoje auto?</label><div class="seg" id="r_car"><button type="button" data-v="true">Tak</button><button type="button" data-v="false">Nie</button></div></div>
+      </div>
+      <label>Status studenta (do umowy)</label>
+      <div class="seg" id="r_student"><button type="button" data-v="true">Student</button><button type="button" data-v="false">Nie</button></div>
+      <label>Doświadczenie za barem</label>
+      <select id="r_exp"><option value="">— wybierz —</option><option>brak</option><option>1 rok</option><option>2–4 lata</option><option>powyżej 5 lat</option></select>
+    </div>
+    <div class="card">
+      <h2>Warunki współpracy</h2>
+      <div class="terms" id="r_terms"></div>
+      <label class="chk"><input type="checkbox" id="r_accept"><span>Przeczytałem/am warunki współpracy z Pimp My Bar i je akceptuję.</span></label>
+      <div class="err hidden" id="rErr"></div>
+      <button class="btn primary" id="rBtn">Dołącz do ekipy</button>
+    </div>
+    <div class="card hidden" id="rDone"><h2>Jesteś w bazie</h2><p class="big" style="margin:0">Dzięki! Tomek zobaczy Twoje zgłoszenie. Jak będzie event w Twojej okolicy, dostaniesz osobisty link z datą, miejscem i stawką.</p></div>
+    <div class="card hidden" id="rClosed"><p class="big" style="margin:0">Nabór jest w tej chwili zamknięty. Napisz do Tomka.</p></div>
+  </div>
+
+  <!-- LINK GRUPOWY: podaj numer -->
+  <div id="join" class="hidden">
+    <div class="card">
+      <h1 id="jName"></h1>
+      <div class="note" id="jWhen"></div>
+      <div class="note" id="jWhere"></div>
+    </div>
+    <div class="card">
+      <h2>Kim jesteś?</h2>
+      <p class="note" style="margin-top:0">Podaj numer telefonu, z którego jesteś w grupie WhatsApp. Dostaniesz swój osobisty link z warunkami eventu.</p>
+      <label>Telefon</label><input id="j_phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+48 600 000 000">
+      <label>W jakiej roli?</label>
+      <div class="seg" id="j_role"><button type="button" data-v="barman" class="on">Barman</button><button type="button" data-v="pomocnik">Pomocnik barmana</button></div>
+      <div class="err hidden" id="jErr"></div>
+      <button class="btn primary" id="jBtn">Pokaż mój link</button>
+    </div>
+    <div class="card hidden" id="jClosed"><p class="big" style="margin:0">Zapisy na ten event są już zamknięte. Napisz do Tomka.</p></div>
+  </div>
+
+  <div id="app" class="hidden">
+
+    <!-- EVENT -->
+    <div class="card">
+      <h1 id="evName"></h1>
+      <div class="note" id="evClient"></div>
+      <div style="height:10px"></div>
+      <div class="row"><div class="k">Kiedy</div><div class="v" id="evWhen"></div></div>
+      <div class="row"><div class="k">Gdzie</div><div class="v" id="evWhere"></div></div>
+      <div class="row" id="evTravelRow"><div class="k">Dojazd</div><div class="v" id="evTravel"></div></div>
+      <div class="row"><div class="k">Skala</div><div class="v" id="evScale"></div></div>
+      <div class="row"><div class="k">Twoja rola</div><div class="v" id="evRole"></div></div>
+      <div class="row"><div class="k">Stawka</div><div class="v"><div class="rate"><b id="evRate"></b><small id="evRateUnit"></small></div><div class="note" id="evRateNote"></div><div class="note" id="evPay" style="margin-top:4px;color:var(--txt)"></div></div></div>
+      <div class="row" id="evSummaryRow"><div class="k">Co robimy</div><div class="v note" id="evSummary" style="color:var(--txt)"></div></div>
+      <div class="row" id="evDressRow"><div class="k">Dress code</div><div class="v" id="evDress"></div></div>
+    </div>
+
+    <!-- FORMULARZ + DECYZJA (przed akceptacją) -->
+    <div class="card" id="formCard">
+      <h2>Twoje dane</h2>
+      <p class="note" style="margin-top:0">Potrzebne do umowy i do kontaktu. Wypełniasz raz.</p>
+      <div class="grid2">
+        <div><label>Imię</label><input id="f_first" autocomplete="given-name"></div>
+        <div><label>Nazwisko</label><input id="f_last" autocomplete="family-name"></div>
+      </div>
+      <label>Telefon</label><input id="f_phone" disabled>
+      <label>E-mail</label><input id="f_email" type="email" autocomplete="email" inputmode="email">
+      <div class="grid2">
+        <div><label>Miasto</label><input id="f_city"></div>
+        <div><label>Rozmiar koszulki</label><select id="f_size"><option value="">—</option><option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select></div>
+      </div>
+      <div class="grid2">
+        <div><label>Masz prawo jazdy?</label>
+        <div class="seg" id="f_lic"><button type="button" data-v="true">Tak</button><button type="button" data-v="false">Nie</button></div></div>
+        <div><label>Masz swoje auto?</label>
+        <div class="seg" id="f_car"><button type="button" data-v="true">Tak</button><button type="button" data-v="false">Nie</button></div></div>
+      </div>
+      <label>Status studenta (do umowy)</label>
+      <div class="seg" id="f_student"><button type="button" data-v="true">Student</button><button type="button" data-v="false">Nie</button></div>
+      <label>Doświadczenie za barem</label>
+      <select id="f_exp"><option value="">— wybierz —</option><option>brak</option><option>1 rok</option><option>2–4 lata</option><option>powyżej 5 lat</option></select>
+
+      <div id="declineBox" class="hidden">
+        <label>Nie pasuje stawka? Napisz, ile byś chciał (opcjonalnie)</label>
+        <input id="f_counter" placeholder="np. 450 zł">
+      </div>
+
+      <div id="termsBox">
+        <label style="margin-top:16px">Warunki współpracy z PMB</label>
+        <details><summary>Rozwiń i przeczytaj (2 minuty)</summary><div class="terms" id="f_terms"></div></details>
+        <label class="chk"><input type="checkbox" id="f_accept"><span>Przeczytałem/am warunki współpracy i je akceptuję.</span></label>
+      </div>
+      <div class="err hidden" id="formErr"></div>
+      <button class="btn primary" id="btnAccept">Wchodzę — akceptuję stawkę i warunki</button>
+      <button class="btn ghost" id="btnDecline">Nie mogę / nie pasuje</button>
+    </div>
+
+    <!-- PO ODRZUCENIU -->
+    <div class="card hidden" id="declinedCard">
+      <h2>Odpowiedź wysłana</h2>
+      <p class="big" style="margin:0">Dzięki za info. Jeśli coś się zmieni, Tomek się odezwie.</p>
+      <button class="btn ghost" id="btnReopen">Zmieniłem zdanie — chcę wejść</button>
+    </div>
+
+    <!-- PO AKCEPTACJI -->
+    <div id="accepted" class="hidden">
+      <div class="card">
+        <h2>Jesteś w składzie</h2>
+        <p class="big" style="margin:0" id="accText"></p>
+        <p class="note">Zapisz ten link — wszystko o evencie znajdziesz tutaj. Jak coś się zmieni, dostaniesz wiadomość.</p>
+      </div>
+
+      <div class="card" id="agendaWait">
+        <h2>Agenda</h2>
+        <p class="big" style="margin:0">Szczegóły (zbiórka, co spakować, menu) pojawią się tutaj kilka dni przed eventem.</p>
+      </div>
+
+      <div id="agenda" class="hidden">
+        <div class="card">
+          <h2>Zbiórka <span class="new hidden" id="newBadge">NOWE</span></h2>
+          <p class="big" style="margin:0" id="agMeeting"></p>
+        </div>
+        <div class="card" id="agScheduleCard"><h2>Godziny pracy</h2><pre class="txt" id="agSchedule"></pre></div>
+        <div class="card" id="agLogCard"><h2>Auto i branding</h2><div id="agLog" class="big"></div></div>
+        <div class="card" id="agWhCard"><h2>Magazyn — jak wejść, co zrobić po powrocie</h2><pre class="txt" id="agWh"></pre></div>
+        <div class="card" id="agPackCard"><h2>Spakuj (Twoje rzeczy)</h2><ul class="list" id="agPack"></ul></div>
+        <div class="card" id="agCashCard"><h2>Rozliczenie z klientem</h2><p class="big" style="margin:0" id="agCash"></p></div>
+        <div class="card" id="agDressCard"><h2>Dress code</h2><p class="big" style="margin:0" id="agDress"></p></div>
+        <div class="card" id="agTransportCard"><h2>Transport</h2><pre class="txt" id="agTransport"></pre></div>
+        <div class="card" id="agMenuCard"><h2>Menu / receptury</h2><pre class="txt" id="agMenu"></pre><div id="agRecipes"></div><a class="btn" id="agMenuPrint" target="_blank" style="display:inline-block;margin-top:10px">🖨 Menu do druku (dla gości)</a></div>
+        <div class="card" id="agNotesCard"><h2>Uwagi</h2><pre class="txt" id="agNotes"></pre></div>
+        <div class="card" id="agContactCard"><h2>Kontakt na miejscu</h2><p class="big" style="margin:0" id="agContact"></p></div>
+      </div>
+
+      <div class="card hidden" id="packCard">
+        <h2>Pakowanie eventu <span class="new hidden" id="packLeftBadge"></span></h2>
+        <p class="note" style="margin:0">Wspólna lista dla całej ekipy. Tapnij pozycję, jak wyląduje na aucie — wszyscy widzą to samo.</p>
+        <div class="prog"><i id="packBar" style="width:0"></i></div>
+        <div class="note" id="packSum"></div>
+        <div class="tog"><button class="on" data-f="left">Do zapakowania</button><button data-f="all">Wszystko</button><button data-f="done">Zapakowane</button></div>
+        <div id="packList"></div>
+      </div>
+      <div class="card" id="updCard"><h2>Aktualizacje</h2><div id="updList"></div></div>
+    </div>
+
+    <p class="note" style="text-align:center;margin-top:20px">Pimp My Bar · pytania: Tomek</p>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://zqpqjgxtefzojhjglppb.supabase.co';
+const SUPABASE_KEY = 'sb_publishable__bPrQF9K35vs8RbLdWBRXQ_VBVj2esQ';
+
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const token = qs.get('t'); const code = qs.get('e'); const mtoken = qs.get('m');
+let D = null;
+
+async function rpc(fn, args){
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {method:'POST',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},
+    body: JSON.stringify(args)});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+const DAYS=['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
+const MONTHS=['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'];
+function fmtDate(s){ const d=new Date(s+'T12:00:00'); return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; }
+function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function money(n){ return n==null?'—':Number(n).toLocaleString('pl-PL')+' zł'; }
+
+function seg(id, val){
+  const box=$(id); [...box.children].forEach(b=>b.classList.toggle('on', String(val)===b.dataset.v));
+}
+function segVal(id){ const on=$(id).querySelector('.on'); return on? on.dataset.v==='true' : null; }
+document.querySelectorAll('.seg').forEach(box=>box.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return; [...box.children].forEach(x=>x.classList.remove('on')); b.classList.add('on');
+}));
+
+function renderTerms(txt){
+  const lines=(txt||'').split('\n').map(l=>l.trim()).filter(Boolean); let out=''; 
+  lines.forEach((l,i)=>{ if(i===0 && !/^\d+\./.test(l)) { out+=`<p style="border:0;font-weight:700;font-size:15px">${esc(l)}</p>`; return; }
+    if(/^\d+\./.test(l)) out+=`<p>${esc(l)}</p>`; else out+=`<h4>${esc(l)}</h4>`; });
+  return out;
+}
+let TERMS=null;
+async function loadTerms(){ if(TERMS) return TERMS; try { TERMS = await rpc('crew_terms',{}); } catch(e){ TERMS={terms:'',warehouse:'',recruit_open:true}; } return TERMS; }
+
+async function recruitFlow(){
+  const t = await loadTerms();
+  $('loading').classList.add('hidden'); $('recruit').classList.remove('hidden');
+  $('statusPill').textContent='Nabór'; $('statusPill').className='pill warn';
+  $('r_terms').innerHTML = renderTerms(t.terms);
+  if(!t.recruit_open){ $('rClosed').classList.remove('hidden'); $('rBtn').disabled=true; }
+  $('rBtn').onclick=async()=>{
+    const d={ first_name:$('r_first').value.trim(), last_name:$('r_last').value.trim(), email:$('r_email').value.trim(), city:$('r_city').value.trim(),
+      shirt_size:$('r_size').value, role:$('r_role').querySelector('.on').dataset.v, driving_license:segVal('r_lic'), has_car:segVal('r_car'),
+      student:segVal('r_student'), experience:$('r_exp').value, accept_terms:$('r_accept').checked?'true':'false' };
+    const ph=$('r_phone').value.trim(); const miss=[];
+    if(!d.first_name) miss.push('imię'); if(!d.last_name) miss.push('nazwisko'); if(ph.replace(/\D/g,'').length<9) miss.push('telefon');
+    if(!/.+@.+\..+/.test(d.email)) miss.push('e-mail'); if(d.driving_license==null) miss.push('prawo jazdy'); if(d.has_car==null) miss.push('auto');
+    if(d.student==null) miss.push('status studenta'); if(!d.experience) miss.push('doświadczenie'); if(!$('r_accept').checked) miss.push('akceptacja warunków');
+    const el=$('rErr'); if(miss.length){ el.classList.remove('hidden'); el.textContent='Uzupełnij: '+miss.join(', '); return; } el.classList.add('hidden');
+    $('rBtn').disabled=true;
+    try { const r=await rpc('crew_register',{p_phone:ph,p_data:d});
+      if(r.exists){ el.classList.remove('hidden'); el.style.color='var(--acc)'; el.textContent='Ten numer jest już w bazie PMB — nie musisz zgłaszać się ponownie.'; $('rBtn').disabled=false; return; }
+      $('rDone').classList.remove('hidden'); $('rBtn').classList.add('hidden'); window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'}); }
+    catch(e){ $('rBtn').disabled=false; el.classList.remove('hidden'); el.textContent=/closed/.test(e.message)?'Nabór zamknięty.':'Nie udało się wysłać. Spróbuj jeszcze raz.'; }
+  };
+}
+
+function render(){
+  const {assignment:a, crew:c, event:e, agenda:ag, updates:ups} = D;
+  $('evName').textContent = e.name;
+  $('evClient').textContent = e.client? 'Klient: '+e.client : '';
+  $('evWhen').innerHTML = `<b>${esc(fmtDate(e.event_date))}</b><br>${esc(e.start_time||'')}${e.end_time?' – '+esc(e.end_time):''}`;
+  const dest = encodeURIComponent((e.venue?e.venue+', ':'')+(e.address||''));
+  const nav = e.map_url || `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
+  const fromMeet = e.meeting_place ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(e.meeting_place)}&destination=${dest}` : null;
+  $('evWhere').innerHTML = `<b>${e.venue_url?`<a href="${esc(e.venue_url)}" target="_blank" rel="noopener">${esc(e.venue||'')}</a>`:esc(e.venue||'')}</b><br><a href="${nav}" target="_blank" rel="noopener" style="color:var(--txt);text-decoration:underline dotted">${esc(e.address||'')}</a>
+    <div class="links"><a href="${nav}" target="_blank" rel="noopener">Nawiguj</a>${fromMeet?`<a href="${fromMeet}" target="_blank" rel="noopener">Trasa zbiórka → event</a>`:''}${e.venue_url?`<a href="${esc(e.venue_url)}" target="_blank" rel="noopener">Strona obiektu</a>`:''}</div>`;
+  $('evTravelRow').classList.toggle('hidden', !e.travel_note); $('evTravel').textContent = e.travel_note||'';
+  $('evPay').textContent = e.payment_info||'';
+  $('evScale').textContent = [e.guests?`~${e.guests} gości`:null, e.bartenders_needed?`${e.bartenders_needed} barmanów`:null, e.helpers_needed?`${e.helpers_needed} pomocników`:null].filter(Boolean).join(' · ');
+  $('evRole').textContent = a.role==='pomocnik'?'Pomocnik barmana':'Barman';
+  $('evRate').textContent = money(a.rate_amount);
+  $('evRateUnit').textContent = a.rate_amount==null?'':(a.rate_unit==='godzina'?'/ godzina':'/ event');
+  $('evRateNote').textContent = a.rate_note||'';
+  $('evSummaryRow').classList.toggle('hidden', !e.summary); $('evSummary').textContent = e.summary||'';
+  $('evDressRow').classList.toggle('hidden', !e.dress_code); $('evDress').textContent = e.dress_code||'';
+
+  // formularz
+  $('f_first').value=c.first_name||''; $('f_last').value=c.last_name||''; $('f_phone').value=c.phone||'';
+  $('f_email').value=c.email||''; $('f_city').value=c.city||''; $('f_size').value=c.shirt_size||''; $('f_exp').value=c.experience||'';
+  if(c.driving_license!=null) seg('f_lic',c.driving_license); if(c.has_car!=null) seg('f_car',c.has_car); if(c.student!=null) seg('f_student',c.student);
+
+  // warunki: pokazuj tylko, jeśli jeszcze nie zaakceptowane
+  $('termsBox').classList.toggle('hidden', !!c.terms_accepted_at);
+  if(!c.terms_accepted_at) loadTerms().then(t=>{ $('f_terms').innerHTML=renderTerms(t.terms); });
+
+  const pill=$('statusPill');
+  $('formCard').classList.add('hidden'); $('declinedCard').classList.add('hidden'); $('accepted').classList.add('hidden');
+  if(a.status==='zaakceptowany'){
+    pill.textContent='W składzie'; pill.className='pill ok';
+    $('accepted').classList.remove('hidden');
+    $('accText').textContent = `${c.first_name||''}, widzimy się ${fmtDate(e.event_date)}. Rola: ${a.role==='pomocnik'?'pomocnik':'barman'}, stawka ${money(a.rate_amount)}${a.rate_unit==='godzina'?'/h':''}.`;
+    if(ag){
+      $('agendaWait').classList.add('hidden'); $('agenda').classList.remove('hidden');
+      $('agMeeting').innerHTML = `<b>${esc(ag.meeting_time||'godzina do potwierdzenia')}</b><br>${esc(ag.meeting_place||'')}`;
+      const pack=(ag.packing_list||'').split('\n').map(s=>s.trim()).filter(Boolean);
+      $('agPackCard').classList.toggle('hidden',!pack.length); $('agPack').innerHTML = pack.map(p=>`<li>${esc(p)}</li>`).join('');
+      if (ag.cash_note) { $('agCash').textContent = ag.cash_note; } else { $('agCashCard').style.display = 'none'; }
+      $('agDressCard').classList.toggle('hidden',!ag.dress_code); $('agDress').textContent=ag.dress_code||'';
+      $('agWhCard').classList.toggle('hidden',!ag.warehouse); $('agWh').textContent=ag.warehouse||'';
+      $('agScheduleCard').classList.toggle('hidden',!ag.schedule); $('agSchedule').textContent=ag.schedule||'';
+      $('agLogCard').classList.toggle('hidden',!(ag.vehicle||ag.branding));
+      $('agLog').innerHTML = [ag.vehicle?`<div><span class="note">Auto</span><br>${esc(ag.vehicle)}</div>`:'', ag.branding?`<div style="margin-top:8px"><span class="note">Klisza / branding</span><br>${esc(ag.branding)}</div>`:''].join('');
+      $('agTransportCard').classList.toggle('hidden',!ag.transport); $('agTransport').textContent=ag.transport||'';
+      $('agMenuCard').classList.toggle('hidden',!ag.menu); $('agMenu').textContent=ag.menu||''; showRecipes(ag.menu); $('agMenuPrint').href=(location.protocol==='file:'?'https://pimpmybar.github.io/pmb-crew/':'')+'menu.html?t='+encodeURIComponent(token);
+      $('agNotesCard').classList.toggle('hidden',!ag.notes); $('agNotes').textContent=ag.notes||'';
+      $('agContactCard').classList.toggle('hidden',!(ag.contact_name||ag.contact_phone));
+      $('agContact').innerHTML = `${esc(ag.contact_name||'')}${ag.contact_phone?` · <a href="tel:${esc(ag.contact_phone)}">${esc(ag.contact_phone)}</a>`:''}`;
+      const isNew = (a.seen_agenda_version||0) < (ag.version||0);
+      $('newBadge').classList.toggle('hidden', !isNew);
+      if(isNew) rpc('crew_respond',{p_token:token,p_action:'seen',p_data:null}).catch(()=>{});
+    } else { $('agendaWait').classList.remove('hidden'); $('agenda').classList.add('hidden'); }
+    loadPacking();
+    $('updCard').classList.toggle('hidden', !ups.length);
+    $('updList').innerHTML = ups.map(u=>`<div class="upd"><time>${new Date(u.created_at).toLocaleString('pl-PL',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})}</time>${esc(u.message)}</div>`).join('');
+  } else if(a.status==='odrzucony'){
+    pill.textContent='Odrzucone'; pill.className='pill bad'; $('declinedCard').classList.remove('hidden');
+  } else {
+    pill.textContent='Czeka na odpowiedź'; pill.className='pill warn'; $('formCard').classList.remove('hidden');
+  }
+}
+
+function formData(){
+  return { first_name:$('f_first').value.trim(), last_name:$('f_last').value.trim(), email:$('f_email').value.trim(),
+    city:$('f_city').value.trim(), shirt_size:$('f_size').value, experience:$('f_exp').value,
+    driving_license:segVal('f_lic'), has_car:segVal('f_car'), student:segVal('f_student'), counter_offer:$('f_counter').value.trim(),
+    accept_terms: $('f_accept').checked?'true':'false' };
+}
+function validate(){
+  const f=formData(); const miss=[];
+  if(!f.first_name) miss.push('imię'); if(!f.last_name) miss.push('nazwisko');
+  if(!f.email||!/.+@.+\..+/.test(f.email)) miss.push('e-mail');
+  if(f.driving_license==null) miss.push('prawo jazdy'); if(f.has_car==null) miss.push('auto'); if(f.student==null) miss.push('status studenta');
+  if(!f.experience) miss.push('doświadczenie');
+  if(!D.crew.terms_accepted_at && !$('f_accept').checked) miss.push('akceptacja warunków');
+  const el=$('formErr'); el.classList.toggle('hidden',!miss.length); el.textContent = miss.length?'Uzupełnij: '+miss.join(', '):'';
+  return !miss.length;
+}
+async function respond(action){
+  const btns=[$('btnAccept'),$('btnDecline')]; btns.forEach(b=>b.disabled=true);
+  try { D = await rpc('crew_respond',{p_token:token,p_action:action,p_data:formData()}); render(); window.scrollTo({top:0,behavior:'smooth'}); }
+  catch(e){ $('formErr').classList.remove('hidden'); $('formErr').textContent='Nie udało się wysłać. Sprawdź internet i spróbuj jeszcze raz.'; }
+  finally { btns.forEach(b=>b.disabled=false); }
+}
+$('btnAccept').onclick = ()=>{ if(validate()) respond('accept'); };
+$('btnDecline').onclick = ()=>{
+  if($('declineBox').classList.contains('hidden')){ $('declineBox').classList.remove('hidden'); $('btnDecline').textContent='Potwierdź: nie wchodzę'; return; }
+  respond('decline');
+};
+/* ---------- PAKOWANIE ---------- */
+let PACK=[], packFilter='left', packTimer=null;
+document.querySelectorAll('.tog button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.tog button').forEach(x=>x.classList.toggle('on',x===b)); packFilter=b.dataset.f; renderPacking(); });
+async function loadPacking(){
+  try { PACK = await rpc('crew_packing',{p_token:token}); } catch(e){ PACK=[]; }
+  renderPacking();
+  clearTimeout(packTimer); if(PACK.length) packTimer=setTimeout(loadPacking, 20000);
+}
+function renderPacking(){
+  const card=$('packCard'); card.classList.toggle('hidden', !PACK.length); if(!PACK.length) return;
+  const done=PACK.filter(p=>p.packed_at).length, left=PACK.length-done;
+  $('packBar').style.width=Math.round(done/PACK.length*100)+'%';
+  $('packSum').textContent = left? `${done}/${PACK.length} zapakowane · zostało ${left}` : `Wszystko zapakowane (${PACK.length}/${PACK.length})`;
+  $('packLeftBadge').classList.toggle('hidden', !left); $('packLeftBadge').textContent = left;
+  const items = PACK.filter(p=> packFilter==='all' || (packFilter==='done'? p.packed_at : !p.packed_at));
+  const cats=[...new Set(items.map(p=>p.category))];
+  $('packList').innerHTML = cats.map(c=>{ const its=items.filter(p=>p.category===c); const all=PACK.filter(p=>p.category===c); const d=all.filter(p=>p.packed_at).length;
+    return `<div class="cat"><h3>${esc(c)}<span>${d}/${all.length}</span></h3>${its.map(p=>`<div class="pi ${p.packed_at?'done':''}" data-id="${p.id}"><div class="box">${p.packed_at?'✓':''}</div><div class="nm">${esc(p.name)}${p.packed_at?`<span class="who">${esc(p.packed_by||'')} · ${new Date(p.packed_at).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})}</span>`:''}</div><div class="q">${esc(p.qty||'')}</div></div>`).join('')}</div>`; }).join('') || '<p class="note" style="margin-top:12px">Nic tu nie ma.</p>';
+  $('packList').querySelectorAll('.pi').forEach(el=>el.onclick=async()=>{
+    const it=PACK.find(p=>p.id===el.dataset.id); const to=!it.packed_at;
+    it.packed_at = to? new Date().toISOString():null; it.packed_by = to? (D.crew.first_name||'ja'):null; renderPacking();
+    try { PACK = await rpc('crew_pack',{p_token:token,p_item:it.id,p_packed:to}); renderPacking(); } catch(e){ loadPacking(); }
+  });
+}
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden && D && D.assignment.status==='zaakceptowany') loadPacking(); });
+
+$('btnReopen').onclick = ()=>{ D.assignment.status='otwarty'; render(); };
+
+async function joinFlow(){
+  let info=null; try { info = await rpc('crew_invite_info',{p_code:code}); } catch(e){}
+  $('loading').classList.add('hidden');
+  if(!info){ $('invalid').classList.remove('hidden'); return; }
+  $('statusPill').textContent='Zapisy'; $('statusPill').className='pill warn';
+  $('jName').textContent=info.name; $('jWhen').textContent=`${fmtDate(info.event_date)} · ${info.start_time||''}${info.end_time?'–'+info.end_time:''}`; $('jWhere').textContent=[info.venue,info.address].filter(Boolean).join(', ');
+  $('join').classList.remove('hidden');
+  if(!info.open){ $('jClosed').classList.remove('hidden'); $('jBtn').disabled=true; }
+  const saved = (()=>{ try{ return localStorage.getItem('pmb_phone')||''; }catch(e){ return ''; } })();
+  if(saved) $('j_phone').value=saved;
+  $('jBtn').onclick=async()=>{
+    const ph=$('j_phone').value.trim(); const role=$('j_role').querySelector('.on').dataset.v;
+    if(ph.replace(/\D/g,'').length<9){ $('jErr').classList.remove('hidden'); $('jErr').textContent='Wpisz pełny numer telefonu.'; return; }
+    $('jBtn').disabled=true; $('jErr').classList.add('hidden');
+    try { const r = await rpc('crew_join',{p_code:code,p_phone:ph,p_role:role}); try{ localStorage.setItem('pmb_phone',ph);}catch(e){}
+      if(r.exists){ $('jBtn').disabled=false; $('jErr').classList.remove('hidden'); $('jErr').style.color='var(--acc)'; $('jErr').textContent='Ten numer jest już na liście tego eventu. Tomek wysłał Ci osobisty link — sprawdź wiadomości na WhatsApp.'; return; }
+      location.replace(location.pathname+'?t='+encodeURIComponent(r.token)); }
+    catch(e){ $('jBtn').disabled=false; $('jErr').classList.remove('hidden'); $('jErr').textContent = /closed/.test(e.message)?'Zapisy zamknięte.':/bad phone/.test(e.message)?'Ten numer wygląda źle — sprawdź.':'Nie udało się. Spróbuj jeszcze raz.'; }
+  };
+}
+
+/* ===== dopasowanie menu eventu do biblioteki receptur ===== */
+const rNorm=s=>String(s).toLowerCase().replace(/[’'`´]/g,"'").replace(/\s+/g,' ').replace(/\s*\(.*?\)\s*$/,'').replace(/\s*0\s*%$/,'').trim();
+const R_SKIP=/^(umowa|welcome|koktajl|menu|alkoholowe|bezalkoholowe|coffee|kubek|lód|lod|batch|piwo|frizzante|\*|serwis|na start|na 5 l)/i;
+function matchRecipes(txt, lib){
+  const idx={}; const put=(k,d)=>{ if(k&&!idx[k]) idx[k]=d; }; lib.forEach(d=>put(rNorm(d.name),d)); lib.forEach(d=>String(d.aliases||'').split(',').forEach(a=>put(rNorm(a),d)));
+  const out=[], seen=new Set();
+  (txt||'').split(/\n+/).forEach(line=>{ line=line.trim(); if(!line||R_SKIP.test(line)) return;
+    const head=line.split(/\s+[—–]\s+|\s+-\s+|\s+·\s+/)[0].trim(); if(!head||head.length>44) return;
+    head.split(/\s*\/\s*/).forEach(nm=>{ const hit=idx[rNorm(nm)]; if(hit&&!seen.has(hit.name)){ seen.add(hit.name); out.push(hit); } }); });
+  return out;
+}
+let RCP_LIB=null;
+async function showRecipes(menuTxt){
+  const box=$('agRecipes'); if(!menuTxt){ box.innerHTML=''; return; }
+  try{ if(!RCP_LIB) RCP_LIB=await rpc('crew_recipes',{}); }catch(e){ RCP_LIB=[]; }
+  const hits=matchRecipes(menuTxt, RCP_LIB||[]);
+  if(!hits.length){ box.innerHTML=''; return; }
+  box.innerHTML='<h2 style="margin-top:14px">Receptury — jak robimy</h2>'+hits.map(r=>`
+    <details style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:6px 0;background:var(--card2)">
+      <summary style="cursor:pointer;font-weight:700;font-size:15px">${esc(r.name)}${r.is_mock?' <span class="pill">0%</span>':''}<span class="note" style="font-weight:400;display:block;margin-top:2px">${esc(r.recipe||r.ing_short||'')}</span></summary>
+      <div class="note" style="margin-top:8px;line-height:1.5">
+        ${r.glass?`<b>Szkło:</b> ${esc(r.glass)} &nbsp; `:''}${r.ice?`<b>Lód:</b> ${esc(r.ice)} &nbsp; `:''}${r.garnish?`<b>Garnish:</b> ${esc(r.garnish)}`:''}
+        ${r.method?`<div style="margin-top:6px;color:var(--txt)">${esc(r.method)}</div>`:''}
+      </div>
+    </details>`).join('');
+}
+async function homeFlow(){
+  let H=null; try{ H=await rpc('crew_home',{p_mtoken:mtoken}); }catch(e){}
+  $('loading').classList.add('hidden');
+  if(!H){ $('invalid').classList.remove('hidden'); return; }
+  $('statusPill').textContent='Moje eventy'; $('statusPill').className='pill';
+  $('home').classList.remove('hidden');
+  if(H.first_name) $('hHello').textContent='Cześć '+H.first_name+'! Twoje eventy';
+  const evs=H.events||[]; const today=new Date().toISOString().slice(0,10);
+  const up=evs.filter(e=>e.event_date>=today), past=evs.filter(e=>e.event_date<today).reverse();
+  const stat=s=>s==='zaakceptowany'?'<span class="pill ok">wchodzisz</span>':s==='odrzucony'?'<span class="pill bad">odrzucone</span>':'<span class="pill warn">do potwierdzenia</span>';
+  const card=e=>`<a class="card" style="display:block;text-decoration:none;color:inherit;margin-bottom:10px" href="?t=${encodeURIComponent(e.token)}">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+        <div><b style="font-size:16px">${esc(e.name)}</b>
+          <div class="note" style="margin:4px 0 0">${fmtDate(e.event_date)} · ${esc(e.start_time||'')}${e.end_time?'–'+esc(e.end_time):''}</div>
+          <div class="note" style="margin:2px 0 0">${esc([e.venue,e.address].filter(Boolean).join(', '))}</div>
+          ${e.meeting_time?`<div class="note" style="margin:2px 0 0">Zbiórka: ${esc(e.meeting_time)}</div>`:''}
+        </div>
+        <div>${stat(e.status)}</div>
+      </div></a>`;
+  $('hList').innerHTML=(up.length?up.map(card).join(''):'<p class="note">Na razie brak nadchodzących eventów — Tomek się odezwie.</p>')
+    +(past.length?'<p class="note" style="margin:16px 0 8px">Ostatnie eventy:</p>'+past.map(card).join(''):'');
+  $('hIcs').onclick=()=>{
+    const list=up.filter(e=>e.status==='zaakceptowany'); if(!list.length){ alert('Brak zaakceptowanych nadchodzących eventów.'); return; }
+    const dt=(d,t)=>{ const p=(t||'12:00').split(':'); return d.replace(/-/g,'')+'T'+String(p[0]).padStart(2,'0')+String(p[1]||'00').padStart(2,'0')+'00'; };
+    const vev=e=>{ let endDate=e.event_date, end=e.end_time||e.start_time||'23:59';
+      if(e.end_time&&e.start_time&&e.end_time<=e.start_time){ const x=new Date(e.event_date+'T12:00:00'); x.setDate(x.getDate()+1); endDate=x.toISOString().slice(0,10); }
+      const cl=s=>String(s||'').replace(/[\n;,]/g,' ');
+      return ['BEGIN:VEVENT','UID:pmb-'+e.token+'@pimpmybar.pl','DTSTART;TZID=Europe/Warsaw:'+dt(e.event_date,e.start_time),'DTEND;TZID=Europe/Warsaw:'+dt(endDate,end),
+        'SUMMARY:PMB — '+cl(e.name),'LOCATION:'+cl([e.venue,e.address].filter(Boolean).join(' ')),
+        'DESCRIPTION:Szczegóły i agenda: '+location.origin+location.pathname+'?t='+e.token,'END:VEVENT'].join('\r\n'); };
+    const ics='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//PMB Crew//PL\r\nCALSCALE:GREGORIAN\r\n'+list.map(vev).join('\r\n')+'\r\nEND:VCALENDAR';
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar;charset=utf-8'})); a.download='pmb-eventy.ics'; a.click();
+  };
+}
+(async()=>{
+  if(!token && mtoken){ return homeFlow(); }
+  if(!token && qs.has('r')){ return recruitFlow(); }
+  if(!token && code){ return joinFlow(); }
+  if(!token){ $('loading').classList.add('hidden'); $('invalid').classList.remove('hidden'); return; }
+  try { D = await rpc('crew_get',{p_token:token}); } catch(e){ D=null; }
+  $('loading').classList.add('hidden');
+  if(!D){ $('invalid').classList.remove('hidden'); $('statusPill').textContent='—'; return; }
+  $('app').classList.remove('hidden'); render();
+  if(D.crew && D.crew.my_token){ const L=$('myEventsLink'); L.href='?m='+encodeURIComponent(D.crew.my_token); L.classList.remove('hidden'); L.style.display='block'; }
+})();
+</script>
+</body>
+</html>

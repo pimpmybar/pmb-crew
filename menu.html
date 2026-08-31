@@ -97,11 +97,18 @@ const LIB=[
  {name:"Passion Cooler",aliases:["Passion Cooler 0%"],mock:true,ing:"Marakuja, limonka, syrop cukrowy, woda gazowana",desc:"Bezalkoholowe orzeźwienie z egzotyczną marakują."},
  {name:"Bellini",ing:"Prosecco, purée brzoskwiniowe",desc:"Wenecki klasyk — delikatny, musujący, brzoskwiniowy."},
 ];
+async function loadLib(){
+  try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/crew_recipes`,{method:'POST',headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},body:'{}'});
+    if(!r.ok) throw 0; const rows=await r.json(); if(!Array.isArray(rows)||!rows.length) throw 0;
+    LIB.length=0; rows.forEach(x=>LIB.push({name:x.name,aliases:String(x.aliases||'').split(',').map(s=>s.trim()).filter(Boolean),ing:x.ing_short||'',desc:x.descr||'',mock:!!x.is_mock}));
+  }catch(e){ /* zostaje wbudowana biblioteka */ }
+  Object.keys(IDX).forEach(k=>delete IDX[k]); const put=(k,d)=>{ if(k&&!IDX[k]) IDX[k]=d; }; LIB.forEach(d=>put(norm(d.name),d)); LIB.forEach(d=>(d.aliases||[]).forEach(a=>put(norm(a),d)));
+}
 const norm=s=>String(s).toLowerCase().replace(/[’'`´]/g,"'").replace(/\s+/g,' ').replace(/\s*0\s*%$/,'').trim();
-const IDX={}; LIB.forEach(d=>{ const put=k=>{ if(!IDX[k]) IDX[k]=d; }; put(norm(d.name)); (d.aliases||[]).forEach(a=>put(norm(a))); });
+const IDX={}; { const put=(k,d)=>{ if(k&&!IDX[k]) IDX[k]=d; }; LIB.forEach(d=>put(norm(d.name),d)); LIB.forEach(d=>(d.aliases||[]).forEach(a=>put(norm(a),d))); }
 
 /* ===== PARSOWANIE MENU EVENTU ===== */
-const SKIP=/^(umowa|welcome|koktajl|menu|alkoholowe|bezalkoholowe|coffee|kubek|lód|lod|batch|piwo|frizzante|\*|serwis|herbat)/i;
+const SKIP=/^(umowa|welcome|koktajl|menu|alkoholowe|bezalkoholowe|coffee|kubek|lód|lod|batch|piwo|frizzante|\*|serwis|cytryny|na start)/i;
 function parseMenu(txt){
   const found=[], seen=new Set();
   const add=(d,mock)=>{ const k=norm(d.name); if(seen.has(k))return; seen.add(k); found.push({...d, mock: mock||d.mock||false}); };
@@ -177,6 +184,7 @@ function toggles(){
 
 /* ===== DANE ===== */
 (async()=>{
+  await loadLib();
   try{
     let menuTxt='', label='';
     if(token){
