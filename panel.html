@@ -596,6 +596,8 @@ async function openEvent(id){
   const PAGE_BASE=location.protocol==='file:'?'https://pimpmybar.github.io/pmb-crew/':''; $('e_agendaBtn').href=PAGE_BASE+'agenda.html?id='+cur.id; $('e_menuBtn').href=PAGE_BASE+'menu.html?id='+cur.id; $('e_gcalBtn').href=gcalUrl(cur); renderChk(); renderCal();
   $('g_transport').value=cur.transport||''; $('g_schedule').value=cur.schedule||''; $('g_vehicle').value=cur.vehicle||''; $('g_branding').value=cur.branding||''; $('g_menu').value=cur.menu||''; $('g_notes').value=cur.notes||''; $('g_pub').checked=!!cur.agenda_published;
   $('a_result').classList.add('hidden');
+  // KLUCZOWE: po zmianie eventu przeładuj pakowanie/ilości — inaczej edycja przenosiła pozycje między eventami
+  PK=[]; if(!$('s_pack').classList.contains('hidden')) loadPack();
   await Promise.all([loadAsgs(), loadUpdates()]);
 }
 $('newEvent').onclick = async()=>{
@@ -694,8 +696,10 @@ function renderGrid(){
   const byCat={}; CAT.forEach(c=>{ const it=PK.find(p=>p.catalog_id===c.id); if(only && !(it&&(it.qty_num!=null||it.note))) return; if(q && !c.name.toLowerCase().includes(q)) return; (byCat[c.category]=byCat[c.category]||[]).push({c,it}); });
   $('q_grid').innerHTML = Object.keys(byCat).map(cat=>`<h2 style="margin:14px 0 4px;color:var(--acc)">${esc(cat)}</h2><table><thead><tr><th>Pozycja</th><th style="width:70px">Jedn.</th><th style="width:110px">Ilość</th><th style="width:140px">Uwagi</th><th style="width:80px" class="right">Stan</th></tr></thead><tbody>${byCat[cat].map(({c,it})=>`<tr><td>${esc(c.name)}</td><td class="muted">${esc(c.unit||'')}</td><td><input type="number" step="any" data-q="${c.id}" value="${it&&it.qty_num!=null?it.qty_num:''}" style="padding:5px 8px"></td><td><input data-n="${c.id}" value="${esc(it&&it.note||'')}" placeholder="KOSZ / KLIENT" style="padding:5px 8px"></td><td class="right muted">${fmtN(c.stock)}</td></tr>`).join('')}</tbody></table>`).join('') || '<p class="muted">Brak pozycji.</p>';
   const save = async(id)=>{ const c=CAT.find(x=>x.id===id); const qv=$('q_grid').querySelector(`[data-q="${id}"]`).value, nv=$('q_grid').querySelector(`[data-n="${id}"]`).value.trim();
-    const it=PK.find(p=>p.catalog_id===id); const body={event_id:cur.id,catalog_id:id,category:c.category,name:c.name,unit:c.unit,sort:c.sort,qty_num:qv===''?null:Number(qv),note:nv||null};
-    if(it){ await api('PATCH',`packing_items?id=eq.${it.id}`,body,'return=minimal'); Object.assign(it,body); }
+    const it=PK.find(p=>p.catalog_id===id);
+    if(it && it.event_id && it.event_id!==cur.id){ toast('Lista była nieaktualna — odświeżam, wpisz jeszcze raz'); await loadPack(); return; }
+    const body={event_id:cur.id,catalog_id:id,category:c.category,name:c.name,unit:c.unit,sort:c.sort,qty_num:qv===''?null:Number(qv),note:nv||null};
+    if(it){ const patch={category:c.category,name:c.name,unit:c.unit,sort:c.sort,qty_num:body.qty_num,note:body.note}; await api('PATCH',`packing_items?id=eq.${it.id}`,patch,'return=minimal'); Object.assign(it,patch); }
     else if(qv!==''||nv){ const [row]=await api('POST','packing_items',body); PK.push(row); }
     toast('Zapisano'); };
   $('q_grid').querySelectorAll('[data-q]').forEach(i=>i.onchange=()=>save(i.dataset.q));
@@ -795,32 +799,65 @@ async function runShop(){
   const f=$('s_from').value, t=$('s_to').value; if(!f||!t) return;
   SHOP.events = await api('GET',`events?select=id,name,event_date,status&event_date=gte.${f}&event_date=lte.${t}&status=in.(wstepny,potwierdzony)&order=event_date`);
   const ids=SHOP.events.map(e=>e.id);
-  SHOP.items = ids.length ? await api('GET',`packing_items?select=event_id,catalog_id,qty_num,note&event_id=in.(${ids.join(',')})&qty_num=not.is.null`) : [];
+  SHOP.items = ids.length ? await api('GET',`packing_items?select=event_id,catalog_id,name,unit,qty_num,note&event_id=in.(${ids.join(',')})&qty_num=not.is.null`) : [];
   $('s_events').textContent = SHOP.events.length ? 'Eventy: '+SHOP.events.map(e=>`${e.name} (${e.event_date})`).join(' · ') : 'Brak eventów w tym zakresie.';
   renderShop();
 }
+/* zgadywanie grupy po nazwie (gdy nie przypisano ręcznie) — np. „Tequilla Jose Cuervo” → TEQUILA */
+function guessGroup(name){
+  const ts=mTokens(name);
+  if(ts.includes('gin')) return 'GIN';
+  if(ts.includes('rum')) return 'RUM';
+  if(ts.some(t=>t.startsWith('wodk'))) return 'WÓDKA';
+  if(ts.some(t=>t.startsWith('tequil'))) return 'TEQUILA';
+  if(ts.some(t=>t.startsWith('whisk')||t.startsWith('bourbon')||t.startsWith('burbon'))) return 'WHISKY';
+  if(ts.some(t=>t.startsWith('prosse')||t.startsWith('prosec'))) return 'PROSECCO';
+  return null;
+}
+const effGroup=c=>c.group_name||guessGroup(c.name);
 function renderShop(){
   const only=$('s_onlyOrder').checked; const evs=SHOP.events;
-  SHOP.rows = CAT.map(c=>{ const per=evs.map(e=>SHOP.items.filter(i=>i.event_id===e.id&&i.catalog_id===c.id).reduce((a,i)=>a+Number(i.qty_num||0),0)); const need=per.reduce((a,b)=>a+b,0); const stock=c.stock==null?0:Number(c.stock); return {c,per,need,stock,order:Math.max(need-stock,0)}; })
-    .filter(r=>r.need>0 || (!only && r.stock>0)).filter(r=>!only || r.order>0);
-  // grupy zamienników: potrzeba i stan liczone dla całej grupy (np. WÓDKA)
+  // pozycje z agend bez podpięcia do katalogu: spróbuj dopasować po nazwie
+  const byName={}; CAT.forEach(c=>byName[mNorm(c.name)]=c);
+  SHOP.items.forEach(i=>{ i._cid = i.catalog_id || byName[mNorm(i.name||'')]?.id || null; });
+  const all = CAT.map(c=>{ const per=evs.map(e=>SHOP.items.filter(i=>i.event_id===e.id&&i._cid===c.id).reduce((a,i)=>a+Number(i.qty_num||0),0)); const need=per.reduce((a,b)=>a+b,0); const stock=c.stock==null?0:Number(c.stock); return {c,per,need,stock,order:Math.max(need-stock,0)}; });
+  const covered = all.filter(r=>r.need>0 && r.order===0);
+  SHOP.rows = all.filter(r=>r.need>0 || (!only && r.stock>0)).filter(r=>!only || r.order>0);
+  // grupy zamienników: potrzeba i stan liczone dla całej grupy (np. WÓDKA); grupa jawna albo zgadnięta z nazwy
   const gNeed={}, gShown=new Set();
-  SHOP.rows.forEach(r=>{ const g=r.c.group_name; if(g) gNeed[g]=(gNeed[g]||0)+r.need; });
+  all.forEach(r=>{ const g=effGroup(r.c); if(g&&r.need>0) gNeed[g]=(gNeed[g]||0)+r.need; });
   const groupHint=(r,colspan)=>{
-    const g=r.c.group_name; if(!g||gShown.has(g)) return '';
-    const others=CAT.filter(c=>c.group_name===g&&c.id!==r.c.id&&Number(c.stock||0)>0);
+    const g=effGroup(r.c); if(!g||gShown.has(g)) return '';
+    const others=CAT.filter(c=>effGroup(c)===g&&c.id!==r.c.id&&Number(c.stock||0)>0);
     if(!others.length) return '';
     gShown.add(g);
-    const gStock=CAT.filter(c=>c.group_name===g).reduce((a,c)=>a+Number(c.stock||0),0);
+    const gStock=CAT.filter(c=>effGroup(c)===g).reduce((a,c)=>a+Number(c.stock||0),0);
     const realOrder=Math.max((gNeed[g]||0)-gStock,0);
     const list=others.map(c=>`<b>${esc(c.name)}</b> — ${fmtN(Number(c.stock))} ${esc(c.unit||'')}${c.price!=null?` (${fmtN(Number(c.price))} zł)`:''} <button class="btn sm" data-sub="${r.c.id}|${c.id}" title="Podmień „${esc(r.c.name)}” na „${esc(c.name)}” w agendach eventów z tego zakresu">Podstaw</button>`).join(' &nbsp; ');
     return `<tr><td colspan="${colspan}" style="padding:6px 10px 10px;border-left:3px solid var(--acc)"><span style="color:var(--acc);font-weight:700">⇄ ${esc(g)}</span> <span class="muted">— masz w grupie:</span> ${list}<br><span class="muted">Cała grupa: potrzeba ${fmtN(gNeed[g]||0)} · stan ${fmtN(gStock)} → realnie do kupienia: </span><b style="color:${realOrder>0?'var(--acc)':'var(--ok)'}">${realOrder>0?fmtN(realOrder):'nic — podstaw z grupy'}</b></td></tr>`;
   };
   let cat=null, html=`<table><thead><tr><th>Pozycja</th><th>Jedn.</th>${evs.map(e=>`<th title="${esc(e.name)}">${esc(e.name.slice(0,14))}<br><span class="muted">${e.event_date.slice(5)}</span></th>`).join('')}<th class="right">Razem</th><th class="right" style="width:90px">Stan</th><th class="right">Do zamówienia</th></tr></thead><tbody>`;
   SHOP.rows.forEach(r=>{ if(r.c.category!==cat){ cat=r.c.category; html+=`<tr><td colspan="${evs.length+5}" style="color:var(--acc);font-weight:700;padding-top:12px">${esc(cat)}</td></tr>`; }
-    html+=`<tr><td>${esc(r.c.name)}${r.c.group_name?` <span class="muted" style="font-size:11px">⇄ ${esc(r.c.group_name)}</span>`:''}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="right muted">${v?fmtN(v):''}</td>`).join('')}<td class="right"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right"></td><td class="right" style="color:${r.order>0?'var(--acc)':'var(--muted)'};font-weight:700">${r.order>0?fmtN(r.order):'—'}</td></tr>`;
+    html+=`<tr><td>${esc(r.c.name)}${effGroup(r.c)?` <span class="muted" style="font-size:11px">⇄ ${esc(effGroup(r.c))}</span>`:''}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="right muted">${v?fmtN(v):''}</td>`).join('')}<td class="right"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right"></td><td class="right" style="color:${r.order>0?'var(--acc)':'var(--muted)'};font-weight:700">${r.order>0?fmtN(r.order):'—'}</td></tr>`;
     if(r.order>0) html+=groupHint(r,evs.length+5); });
-  html+='</tbody></table>'; $('s_table').innerHTML = SHOP.rows.length? html : '<p class="muted">Nic do zamówienia.</p>';
+  html+='</tbody></table>';
+  // pozycje potrzebne, ale w całości pokryte ze stanu — żeby nie wyglądało, że „zniknęły”
+  if(only && covered.length) html+=`<p class="muted" style="margin:10px 0 0"><b style="color:var(--ok)">✓ Pokryte ze stanu magazynu</b> (nie kupujesz, ale pakujesz): ${covered.map(r=>`${esc(r.c.name)} — ${fmtN(r.need)} ${esc(r.c.unit||'')} (stan ${fmtN(r.stock)})`).join(' · ')}</p>`;
+  // pozycje z agend, których nie udało się dopasować do katalogu — nie liczą się do zamówienia!
+  const unMap={};
+  SHOP.items.filter(i=>!i._cid&&Number(i.qty_num||0)>0).forEach(i=>{ const k=mNorm(i.name||'')||'?'; (unMap[k]=unMap[k]||{name:i.name||'(bez nazwy)',unit:i.unit||'',qty:0,evs:new Set()}); unMap[k].qty+=Number(i.qty_num||0); unMap[k].evs.add(SHOP.events.find(e=>e.id===i.event_id)?.name||'?'); });
+  const un=Object.entries(unMap);
+  if(un.length) html+=`<div style="border:1px solid var(--bad);border-radius:10px;padding:10px 12px;margin-top:12px"><b style="color:var(--bad)">⚠ Pozycje z agend niepodpięte do katalogu</b> <span class="muted">— NIE liczą się do zamówienia, dopóki ich nie podepniesz:</span>
+    ${un.map(([k,u],i)=>`<div style="margin-top:6px"><b>${esc(u.name)}</b> — ${fmtN(u.qty)} ${esc(u.unit)} <span class="muted">(${[...u.evs].join(', ')})</span> <button class="btn sm" data-unlink="${esc(k)}">Dodaj do katalogu i policz</button></div>`).join('')}</div>`;
+  $('s_table').innerHTML = (SHOP.rows.length||un.length||((only&&covered.length)))? html : '<p class="muted">Nic do zamówienia.</p>';
+  $('s_table').querySelectorAll('[data-unlink]').forEach(b=>b.onclick=async()=>{
+    const u=unMap[b.dataset.unlink]; if(!u) return;
+    if(!confirm(`Dodaję „${u.name}” do katalogu (kategoria INNE — potem możesz zmienić w Magazynie) i podpinam pozycje z agend. OK?`)) return;
+    const [row]=await api('POST','catalog',{category:'INNE',name:u.name,unit:u.unit||'szt.',sort:999},'return=representation');
+    for(const it of SHOP.items.filter(i=>!i._cid&&mNorm(i.name||'')===b.dataset.unlink))
+      await api('PATCH',`packing_items?event_id=eq.${it.event_id}&catalog_id=is.null&name=eq.${encodeURIComponent(it.name)}`,{catalog_id:row.id},'return=minimal');
+    toast('Podpięto do katalogu'); await loadCatalog(); await runShop();
+  });
   $('s_table').querySelectorAll('[data-stock]').forEach(i=>i.onchange=async()=>{ const c=CAT.find(x=>x.id===i.dataset.stock); c.stock=i.value===''?null:Number(i.value); await api('PATCH',`catalog?id=eq.${c.id}`,{stock:c.stock,stock_updated_at:new Date().toISOString()},'return=minimal'); renderShop(); toast('Stan zapisany'); });
   $('s_table').querySelectorAll('[data-sub]').forEach(b=>b.onclick=async()=>{
     const [srcId,tgtId]=b.dataset.sub.split('|');
