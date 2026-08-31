@@ -374,6 +374,17 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
         <div id="s_snaps" class="muted">—</div>
         <div style="overflow-x:auto;margin-top:10px"><div id="s_snapView"></div></div>
       </div>
+      <div class="card">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+          <h2 style="margin:0;flex:1">Magazyn — przegląd i porządkowanie</h2>
+          <button class="btn sm" data-mv="today">Dziś wprowadzone</button>
+          <button class="btn sm" data-mv="dupes">Możliwe duplikaty</button>
+          <button class="btn sm" data-mv="all">Cały katalog</button>
+        </div>
+        <p class="muted" style="margin-top:0">Nazwę i kategorię poprawiasz wprost w tabeli (zapisuje się samo). „Scal” przenosi pozycję do innej (agendy i eventy przepinają się na tę drugą). „Ukryj” chowa pozycję z list, nie kasuje historii.</p>
+        <input id="m_q" placeholder="Szukaj…" style="margin-bottom:8px;max-width:300px">
+        <div style="overflow-x:auto"><div id="m_table" class="muted">Wybierz widok powyżej.</div></div>
+      </div>
     </div>
 
     <!-- ===== USTAWIENIA ===== -->
@@ -773,7 +784,7 @@ function isoMonday(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDat
 async function loadShop(){
   if(!CAT.length) await loadCatalog();
   if(!$('s_from').value) setWeek(0);
-  await runShop(); loadSnaps();
+  await runShop(); loadSnaps(); renderMag();
 }
 function setWeek(offset){ const m=new Date(isoMonday(new Date())); m.setDate(m.getDate()+7*offset); const t=new Date(m); t.setDate(t.getDate()+6); $('s_from').value=m.toISOString().slice(0,10); $('s_to').value=t.toISOString().slice(0,10); }
 async function runShop(){
@@ -831,6 +842,64 @@ $('s_clear').onclick=async()=>{
   await api('PATCH','catalog?stock=not.is.null',{stock:null,stock_updated_at:new Date().toISOString()},'return=minimal');
   await loadCatalog(); renderShop(); toast('Stan magazynu wyczyszczony');
 };
+
+/* ---------- MAGAZYN: przegląd / porządkowanie ---------- */
+let MV='today';
+const mNorm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+function mDupes(){
+  const groups={};
+  CAT.forEach(c=>{ const k=mNorm(c.name); (groups[k]=groups[k]||[]).push(c); });
+  // także prefiksy: "rurki" vs "rurki 100 szt"
+  const keys=Object.keys(groups);
+  keys.forEach(a=>keys.forEach(b=>{ if(a!==b&&a.length>=5&&(b.startsWith(a)||a.startsWith(b))){ groups[a].forEach(x=>{ if(!groups[b].includes(x)) groups[b].push(x); }); } }));
+  const ids=new Set();
+  Object.values(groups).forEach(g=>{ const u=[...new Set(g)]; if(u.length>1) u.forEach(c=>ids.add(c.id)); });
+  return ids;
+}
+async function renderMag(){
+  if(!CAT.length) await loadCatalog();
+  const q=($('m_q').value||'').toLowerCase(); const today=new Date().toISOString().slice(0,10);
+  const dup=MV==='dupes'?mDupes():null;
+  let rows=CAT.filter(c=>{
+    if(q && !(c.name+' '+c.category).toLowerCase().includes(q)) return false;
+    if(MV==='today') return c.stock_updated_at && c.stock_updated_at.slice(0,10)===today;
+    if(MV==='dupes') return dup.has(c.id);
+    return true;
+  });
+  const catOpts=[...new Set(CAT.map(c=>c.category))];
+  $('m_table').innerHTML = rows.length? `<table><thead><tr><th style="width:44px"></th><th style="width:170px">Kategoria</th><th>Nazwa</th><th style="width:70px">Jedn.</th><th style="width:80px" class="right">Stan</th><th style="width:150px">Kto · kiedy</th><th style="width:190px" class="right">Akcje</th></tr></thead><tbody>${rows.map(c=>`
+    <tr data-mid="${c.id}" ${c.active===false?'style="opacity:.45"':''}>
+      <td>${c.photo_url?`<img src="${esc(c.photo_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td>
+      <td><input data-mcat="${c.id}" value="${esc(c.category)}" list="catList" style="padding:5px 8px"></td>
+      <td><input data-mname="${c.id}" value="${esc(c.name)}" style="padding:5px 8px"></td>
+      <td><input data-munit="${c.id}" value="${esc(c.unit||'')}" style="padding:5px 8px;width:60px"></td>
+      <td><input type="number" step="any" data-mstock="${c.id}" value="${c.stock??''}" style="padding:5px 8px;width:70px;text-align:right"></td>
+      <td class="muted" style="font-size:12px">${c.stock_updated_by?esc(c.stock_updated_by)+' · ':''}${c.stock_updated_at?new Date(c.stock_updated_at).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—'}</td>
+      <td class="right"><button class="btn sm" data-mmerge="${c.id}">Scal →</button> <button class="btn sm" data-mhide="${c.id}">${c.active===false?'Przywróć':'Ukryj'}</button></td>
+    </tr>`).join('')}</tbody></table>` : '<p class="muted">Brak pozycji w tym widoku.</p>';
+  const save=async(id,body)=>{ await api('PATCH',`catalog?id=eq.${id}`,body,'return=minimal'); const c=CAT.find(x=>x.id===id); Object.assign(c,body); toast('Zapisano'); };
+  $('m_table').querySelectorAll('[data-mcat]').forEach(i=>i.onchange=()=>save(i.dataset.mcat,{category:i.value.trim()||'INNE'}));
+  $('m_table').querySelectorAll('[data-mname]').forEach(i=>i.onchange=()=>save(i.dataset.mname,{name:i.value.trim()}));
+  $('m_table').querySelectorAll('[data-munit]').forEach(i=>i.onchange=()=>save(i.dataset.munit,{unit:i.value.trim()}));
+  $('m_table').querySelectorAll('[data-mstock]').forEach(i=>i.onchange=()=>save(i.dataset.mstock,{stock:i.value===''?null:Number(i.value),stock_updated_at:new Date().toISOString()}));
+  $('m_table').querySelectorAll('[data-mhide]').forEach(b=>b.onclick=async()=>{ const c=CAT.find(x=>x.id===b.dataset.mhide); await save(c.id,{active:c.active===false}); renderMag(); });
+  $('m_table').querySelectorAll('[data-mmerge]').forEach(b=>b.onclick=async()=>{
+    const src=CAT.find(x=>x.id===b.dataset.mmerge);
+    const cands=CAT.filter(x=>x.id!==src.id&&x.active!==false).sort((a,b2)=>(mNorm(a.name).startsWith(mNorm(src.name).slice(0,5))?-1:0)-(mNorm(b2.name).startsWith(mNorm(src.name).slice(0,5))?-1:0));
+    const pick=prompt('Scal „'+src.name+'” z którą pozycją? Wpisz fragment nazwy docelowej:\n\nPodpowiedzi: '+cands.slice(0,6).map(c=>c.name).join(' · '));
+    if(pick===null||!pick.trim()) return;
+    const matches=CAT.filter(x=>x.id!==src.id&&x.name.toLowerCase().includes(pick.trim().toLowerCase()));
+    if(!matches.length){ alert('Nie znalazłem takiej pozycji.'); return; }
+    const tgt=matches[0];
+    if(!confirm(`Scalam „${src.name}” → „${tgt.name}”.\nWszystkie agendy przepinam na „${tgt.name}”. Stan docelowy: ${tgt.stock??'—'} (stan „${src.name}”: ${src.stock??'—'}).\nKontynuować?`)) return;
+    await api('PATCH',`packing_items?catalog_id=eq.${src.id}`,{catalog_id:tgt.id,name:tgt.name,category:tgt.category,unit:tgt.unit},'return=minimal');
+    if((tgt.stock==null)&&src.stock!=null) await api('PATCH',`catalog?id=eq.${tgt.id}`,{stock:src.stock,stock_updated_at:new Date().toISOString()},'return=minimal');
+    await api('DELETE',`catalog?id=eq.${src.id}`,null,'return=minimal');
+    toast('Scalono'); await loadCatalog(); renderMag(); renderShop();
+  });
+}
+document.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{ MV=b.dataset.mv; document.querySelectorAll('[data-mv]').forEach(x=>x.style.fontWeight=x===b?'700':''); renderMag(); });
+$('m_q').oninput=()=>renderMag();
 
 /* ---------- MOTYW ---------- */
 if(localStorage.getItem('pmb_theme')==='light') document.documentElement.classList.add('light');
