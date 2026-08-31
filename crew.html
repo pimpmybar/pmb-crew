@@ -102,7 +102,23 @@ pre.txt{white-space:pre-wrap;font:inherit;margin:0;line-height:1.5}
     <p class="note" id="hSub" style="margin-top:0">Twoje najbliższe wyjazdy z PMB. Kliknij event, żeby zobaczyć szczegóły i agendę.</p>
     <div id="hList"></div>
     <button class="btn" id="hIcs" style="margin-top:14px">📅 Dodaj do kalendarza (.ics)</button>
+    <div id="whList" class="hidden" style="margin-top:22px">
+      <h1 style="margin:0 0 4px;font-size:22px">Magazyn — wszystkie eventy</h1>
+      <p class="note" style="margin-top:0">Masz dostęp magazynowy: możesz zajrzeć do agendy i pakować każdy nadchodzący event.</p>
+      <div id="whItems"></div>
+    </div>
     <p class="note" style="margin-top:8px">Plik .ics otwórz na telefonie — eventy dodadzą się do kalendarza Google/Apple.</p>
+  </div>
+
+  <div id="wh" class="hidden">
+    <a id="whBack" class="btn" style="display:block;text-align:center;margin-bottom:10px">‹ Wszystkie eventy</a>
+    <div class="card"><h1 id="whName" style="margin:0 0 6px"></h1><div class="note" id="whWhen"></div><div class="note" id="whWhere" style="margin-top:2px"></div></div>
+    <div class="card"><h2>Logistyka</h2><div id="whLog" style="line-height:1.7"></div></div>
+    <div class="card"><h2>Pakowanie <span class="pill" id="whProg"></span></h2>
+      <div class="bar" style="height:6px;background:var(--card2);border-radius:999px;overflow:hidden;margin:6px 0 10px"><i id="whBar" style="display:block;height:100%;width:0;background:var(--ok)"></i></div>
+      <div id="whPack"></div></div>
+    <div class="card" id="whMenuCard"><h2>Menu / receptury</h2><pre class="txt" id="whMenu"></pre></div>
+    <div class="card" id="whNotesCard"><h2>Uwagi</h2><div id="whNotes" class="note" style="line-height:1.6"></div></div>
   </div>
 
   <div id="recruit" class="hidden">
@@ -278,7 +294,7 @@ const SUPABASE_KEY = 'sb_publishable__bPrQF9K35vs8RbLdWBRXQ_VBVj2esQ';
 
 const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
-const token = qs.get('t'); const code = qs.get('e'); const mtoken = qs.get('m');
+const token = qs.get('t'); const code = qs.get('e'); const mtoken = qs.get('m') || qs.get('w'); const whEv = qs.get('ev');
 let D = null;
 
 async function rpc(fn, args){
@@ -523,6 +539,13 @@ async function homeFlow(){
       </div></a>`;
   $('hList').innerHTML=(up.length?up.map(card).join(''):'<p class="note">Na razie brak nadchodzących eventów — Tomek się odezwie.</p>')
     +(past.length?'<p class="note" style="margin:16px 0 8px">Ostatnie eventy:</p>'+past.map(card).join(''):'');
+  try{ const W=await rpc('wh_events',{p_mtoken:mtoken}); if(Array.isArray(W)){ $('whList').classList.remove('hidden');
+    $('whItems').innerHTML=W.length?W.map(e=>`<a class="card" style="display:block;text-decoration:none;color:inherit;margin-bottom:10px" href="?w=${encodeURIComponent(mtoken)}&ev=${e.id}">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><div><b style="font-size:16px">${esc(e.name)}</b>
+        <div class="note" style="margin:4px 0 0">${fmtDate(e.event_date)}${e.event_end_date&&e.event_end_date!==e.event_date?' → '+fmtDate(e.event_end_date):''} · ${esc(e.start_time||'')}${e.end_time?'–'+esc(e.end_time):''}</div>
+        <div class="note" style="margin:2px 0 0">${esc([e.venue,e.address].filter(Boolean).join(', '))}</div>
+        <div class="note" style="margin:2px 0 0">${e.vehicle?'🚐 '+esc(e.vehicle)+' · ':''}${e.modules?esc(e.modules)+' · ':''}zbiórka ${esc(e.meeting_time||'do ustalenia')}</div></div>
+        <div><span class="pill ${e.pack_total&&e.pack_done>=e.pack_total?'ok':e.pack_done?'warn':''}">${e.pack_total?`spakowane ${e.pack_done}/${e.pack_total}`:'brak listy'}</span></div></div></a>`).join(''):'<p class="note">Brak nadchodzących eventów.</p>'; } }catch(e){}
   $('hIcs').onclick=()=>{
     const list=up.filter(e=>e.status==='zaakceptowany'); if(!list.length){ alert('Brak zaakceptowanych nadchodzących eventów.'); return; }
     const dt=(d,t)=>{ const p=(t||'12:00').split(':'); return d.replace(/-/g,'')+'T'+String(p[0]).padStart(2,'0')+String(p[1]||'00').padStart(2,'0')+'00'; };
@@ -536,7 +559,31 @@ async function homeFlow(){
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar;charset=utf-8'})); a.download='pmb-eventy.ics'; a.click();
   };
 }
+let WH=null, whTimer=null;
+async function whLoad(){ try{ WH=await rpc('wh_event',{p_mtoken:mtoken,p_event:whEv}); }catch(e){ WH=null; } }
+function whRender(){
+  if(!WH){ $('invalid').classList.remove('hidden'); return; }
+  const e=WH.event, ag=WH.agenda, P=WH.packing||[];
+  $('wh').classList.remove('hidden'); $('whBack').href='?m='+encodeURIComponent(mtoken);
+  $('statusPill').textContent='Magazyn'; $('statusPill').className='pill';
+  $('whName').textContent=e.name; $('whWhen').textContent=`${fmtDate(e.event_date)}${e.event_end_date&&e.event_end_date!==e.event_date?' → '+fmtDate(e.event_end_date):''} · ${e.start_time||''}${e.end_time?'–'+e.end_time:''}${e.guests?' · '+e.guests+' os.':''}`;
+  $('whWhere').textContent=[e.venue,e.address].filter(Boolean).join(', ');
+  const rows=[['Zbiórka',[ag.meeting_time,ag.meeting_place].filter(Boolean).join(' · ')],['Wyjazd',ag.departure_time],['Auto',ag.vehicle],['Bary',ag.modules],['Klisza',ag.branding],['Ekipa',`${e.bartenders_needed||0} barm.${e.helpers_needed?' + '+e.helpers_needed+' pom.':''}`],['Godziny',e.schedule],['Dress code',ag.dress_code],['Kontakt',[ag.contact_name,ag.contact_phone].filter(Boolean).join(' · ')]];
+  $('whLog').innerHTML=rows.filter(r=>r[1]).map(r=>`<div><span class="note">${r[0]}:</span> ${esc(r[1])}</div>`).join('');
+  $('whMenuCard').classList.toggle('hidden',!ag.menu); $('whMenu').textContent=ag.menu||'';
+  $('whNotesCard').classList.toggle('hidden',!ag.notes); $('whNotes').textContent=ag.notes||'';
+  const done=P.filter(p=>p.packed_at).length; $('whProg').textContent=P.length?`${done}/${P.length}`:'brak listy'; $('whBar').style.width=P.length?Math.round(done/P.length*100)+'%':'0';
+  const cats=[...new Set(P.map(p=>p.category))];
+  $('whPack').innerHTML=cats.map(cat=>{ const its=P.filter(p=>p.category===cat); const d=its.filter(p=>p.packed_at).length;
+    return `<div class="cat"><h3>${esc(cat)}<span>${d}/${its.length}</span></h3>${its.map(p=>`<div class="pi ${p.packed_at?'done':''}" data-wid="${p.id}"><div class="box">${p.packed_at?'✓':''}</div><div class="nm">${esc(p.name)}${p.packed_at?`<span class="who">${esc(p.packed_by||'')} · ${new Date(p.packed_at).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})}</span>`:''}</div><div class="q">${esc(p.qty||'')}</div></div>`).join('')}</div>`; }).join('')||'<p class="note">Lista pakowania jeszcze nie jest gotowa.</p>';
+  $('whPack').querySelectorAll('.pi').forEach(el=>el.onclick=async()=>{ const it=P.find(p=>p.id===el.dataset.wid); const to=!it.packed_at; it.packed_at=to?new Date().toISOString():null; it.packed_by=to?'ja':null; whRender();
+    try{ WH=await rpc('wh_pack',{p_mtoken:mtoken,p_item:it.id,p_packed:to}); whRender(); }catch(e){ await whLoad(); whRender(); } });
+  clearTimeout(whTimer); whTimer=setTimeout(async()=>{ await whLoad(); whRender(); },20000);
+}
+async function whFlow(){ await whLoad(); $('loading').classList.add('hidden'); whRender(); }
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden && WH){ whLoad().then(whRender); } });
 (async()=>{
+  if(!token && mtoken && whEv){ return whFlow(); }
   if(!token && mtoken){ return homeFlow(); }
   if(!token && qs.has('r')){ return recruitFlow(); }
   if(!token && code){ return joinFlow(); }

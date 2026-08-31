@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PMB — Remanent magazynu</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0d0f;--card:#17171b;--card2:#1f1f25;--line:#2a2a32;--txt:#f2f0ea;--muted:#9a9aa6;--acc:#e8b04b;--ok:#4cc38a;--bad:#e5534b}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,sans-serif;font-size:15px}
+.wrap{max-width:720px;margin:0 auto;padding:14px 14px 80px}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0 14px}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.06em}.logo span{color:var(--acc)}
+.pill{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--card2);color:var(--muted);padding:5px 10px;border-radius:999px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+h2{font-size:12px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.1em;margin:18px 0 6px}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+input{width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font:inherit;font-size:16px;outline:none}
+input:focus{border-color:var(--acc)}
+.row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row .n{flex:1;min-width:0}.row .n b{display:block;font-weight:500}.row .n small{color:var(--muted);font-size:11px}
+.row input{width:96px;text-align:right;padding:9px 10px}
+.row .u{width:40px;color:var(--muted);font-size:12px}
+.row.saved input{border-color:var(--ok)}
+.ph{width:44px;height:44px;border-radius:8px;background:var(--card2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:18px;flex:none;overflow:hidden;cursor:pointer}
+.ph img{width:100%;height:100%;object-fit:cover}
+.ph.busy{opacity:.5}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;font:inherit;font-weight:700;font-size:16px;cursor:pointer;background:var(--card2);color:var(--txt);border:1px solid var(--line)}
+.btn.primary{background:var(--acc);color:#151004;border-color:var(--acc)}
+.note{color:var(--muted);font-size:13px}
+.sticky{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:10px 14px}
+.sticky .in{max-width:720px;margin:0 auto;display:flex;gap:10px}
+.toast{position:fixed;top:12px;left:50%;transform:translateX(-50%);background:var(--ok);color:#06210f;padding:8px 14px;border-radius:999px;font-weight:700;font-size:13px;opacity:0;transition:.2s;pointer-events:none}
+.toast.on{opacity:1}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><div class="logo">PIMP MY BAR <span>MAGAZYN</span></div><span class="pill">Remanent</span></div>
+  <div id="loading" class="note">Ładowanie…</div>
+  <div id="invalid" class="card hidden">Ten link jest nieprawidłowy albo został zmieniony. Poproś Tomka o aktualny link do remanentu.</div>
+  <div id="app" class="hidden">
+    <div class="card">
+      <label>Kto liczy (imię)</label><input id="who" placeholder="np. Patryk">
+      <label>Szukaj pozycji</label><input id="q" placeholder="np. gin, limonki, kubki…">
+      <p class="note" style="margin:10px 0 0">Wpisz aktualny stan — zapisuje się samo po wyjściu z pola. Puste = nie liczono. Ikona 📷 przy pozycji = zrób zdjęcie telefonem (zapisze się w bazie). Na koniec kliknij „Zapisz remanent”.</p>
+    </div>
+    <details class="card">
+      <summary style="cursor:pointer;font-weight:700">＋ Dodaj nową pozycję (czego nie ma na liście)</summary>
+      <div class="grid2" style="margin-top:8px">
+        <div><label>Kategoria</label><input id="n_cat" list="catList" placeholder="np. CHECK LIST"><datalist id="catList"></datalist></div>
+        <div><label>Jednostka</label><input id="n_unit" placeholder="szt. / bt / kg / l" value="szt."></div>
+      </div>
+      <label>Nazwa</label><input id="n_name" placeholder="np. Termoboksy">
+      <label>Stan teraz</label><input id="n_stock" type="number" inputmode="decimal" step="any" placeholder="ile jest">
+      <button class="btn" id="n_add" style="margin-top:10px">Dodaj do katalogu</button>
+    </details>
+    <div id="list"></div>
+  </div>
+</div>
+<div class="sticky hidden" id="bar"><div class="in"><button class="btn primary" id="snap">✔ Zapisz remanent</button></div></div>
+<div class="toast" id="toast"></div>
+<script>
+const SUPABASE_URL='https://zqpqjgxtefzojhjglppb.supabase.co', SUPABASE_KEY='sb_publishable__bPrQF9K35vs8RbLdWBRXQ_VBVj2esQ';
+const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const key=new URLSearchParams(location.search).get('k');
+async function uploadPhoto(item, file){
+  // zmniejsz zdjęcie (max 1000 px) i wyślij do Supabase Storage: catalog/<klucz>/<id>.jpg
+  const bmp=await createImageBitmap(file); const k=Math.min(1,1000/Math.max(bmp.width,bmp.height));
+  const cv=document.createElement('canvas'); cv.width=Math.round(bmp.width*k); cv.height=Math.round(bmp.height*k); cv.getContext('2d').drawImage(bmp,0,0,cv.width,cv.height);
+  const blob=await new Promise(res=>cv.toBlob(res,'image/jpeg',0.82));
+  const path=`${key}/${item.id}.jpg`;
+  const r=await fetch(`${SUPABASE_URL}/storage/v1/object/catalog/${path}`,{method:'POST',headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'image/jpeg','x-upsert':'true'},body:blob});
+  if(!r.ok) throw new Error(await r.text());
+  const url=`${SUPABASE_URL}/storage/v1/object/public/catalog/${path}?v=${Date.now()}`;
+  await rpc('stock_set_photo',{p_key:key,p_id:item.id,p_url:url}); return url;
+}
+async function rpc(fn,args){ const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`,{method:'POST',headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify(args)}); if(!r.ok) throw new Error(await r.text()); return r.json(); }
+let toastT; function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),1400); }
+let ITEMS=[];
+try{ $('who').value=localStorage.getItem('pmb_stock_who')||''; }catch(e){}
+$('who').onchange=()=>{ try{ localStorage.setItem('pmb_stock_who',$('who').value.trim()); }catch(e){} };
+function render(){
+  const q=$('q').value.trim().toLowerCase(); let cat=null, html='';
+  ITEMS.filter(i=>!q||i.name.toLowerCase().includes(q)||i.category.toLowerCase().includes(q)).forEach(i=>{
+    if(i.category!==cat){ cat=i.category; html+=`${html?'</div>':''}<h2>${esc(cat)}</h2><div class="card">`; }
+    const upd=i.updated_at?new Date(i.updated_at).toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit'})+(i.updated_by?' · '+esc(i.updated_by):''):'';
+    html+=`<div class="row" data-id="${i.id}"><label class="ph" title="Zrób zdjęcie">${i.photo_url?`<img src="${esc(i.photo_url)}" alt="">`:'📷'}<input type="file" accept="image/*" capture="environment" data-photo="${i.id}" style="display:none"></label><div class="n"><b>${esc(i.name)}</b>${upd?`<small>ost. ${upd}</small>`:''}</div><input type="number" inputmode="decimal" step="any" value="${i.stock??''}" data-stock="${i.id}"><span class="u">${esc(i.unit||'')}</span></div>`;
+  });
+  $('list').innerHTML=html?html+'</div>':'<p class="note">Brak pozycji.</p>';
+  $('list').querySelectorAll('[data-stock]').forEach(inp=>inp.onchange=async()=>{
+    const it=ITEMS.find(x=>x.id===inp.dataset.stock); const v=inp.value===''?null:Number(inp.value);
+    try{ await rpc('stock_set',{p_key:key,p_id:it.id,p_stock:v,p_by:$('who').value.trim()}); it.stock=v; it.updated_at=new Date().toISOString(); it.updated_by=$('who').value.trim(); inp.closest('.row').classList.add('saved'); toast('Zapisano'); }
+    catch(e){ alert('Nie zapisano — sprawdź internet.'); }
+  });
+}
+$('q').oninput=render;
+$('list').addEventListener('change', async ev=>{
+  const inp=ev.target; if(!inp.dataset.photo||!inp.files||!inp.files[0]) return;
+  const it=ITEMS.find(x=>x.id===inp.dataset.photo); const box=inp.closest('.ph'); box.classList.add('busy');
+  try{ const url=await uploadPhoto(it, inp.files[0]); it.photo_url=url; box.innerHTML=`<img src="${url}" alt=""><input type="file" accept="image/*" capture="environment" data-photo="${it.id}" style="display:none">`; toast('Zdjęcie zapisane'); }
+  catch(e){ alert('Nie udało się wysłać zdjęcia: '+(e.message||'').slice(0,120)); }
+  box.classList.remove('busy');
+});
+$('n_add').onclick=async()=>{
+  const name=$('n_name').value.trim(); if(!name){ alert('Podaj nazwę pozycji.'); return; }
+  try{ await rpc('stock_add',{p_key:key,p_category:$('n_cat').value.trim()||'INNE',p_name:name,p_unit:$('n_unit').value.trim()||'szt.',p_stock:$('n_stock').value===''?null:Number($('n_stock').value),p_by:$('who').value.trim()});
+    ITEMS=await rpc('stock_list',{p_key:key}); $('catList').innerHTML=[...new Set(ITEMS.map(i=>i.category))].map(c=>`<option value="${esc(c)}">`).join(''); render();
+    $('n_name').value=''; $('n_stock').value=''; toast('Dodano: '+name); }
+  catch(e){ alert('Nie udało się dodać pozycji.'); }
+};
+$('snap').onclick=async()=>{
+  const who=$('who').value.trim(); if(!who){ alert('Wpisz najpierw, kto liczy (imię).'); $('who').focus(); return; }
+  const note=prompt('Nazwa remanentu (np. „po weekendzie 5–6.09”):',''); if(note===null) return;
+  try{ await rpc('stock_snapshot',{p_key:key,p_note:note,p_by:who}); toast('Remanent zapisany w historii'); }
+  catch(e){ alert('Nie udało się zapisać remanentu.'); }
+};
+(async()=>{
+  if(!key){ $('loading').classList.add('hidden'); $('invalid').classList.remove('hidden'); return; }
+  try{ ITEMS=await rpc('stock_list',{p_key:key}); }catch(e){ $('loading').classList.add('hidden'); $('invalid').classList.remove('hidden'); return; }
+  $('loading').classList.add('hidden'); $('app').classList.remove('hidden'); $('bar').classList.remove('hidden'); $('catList').innerHTML=[...new Set(ITEMS.map(i=>i.category))].map(c=>`<option value="${esc(c)}">`).join(''); render();
+})();
+</script>
+</body>
+</html>
