@@ -28,6 +28,7 @@ input:focus{border-color:var(--acc)}
 .ph img{width:100%;height:100%;object-fit:cover}
 .ph.busy{opacity:.5}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px}.chips span{font-size:12px;font-weight:600;padding:6px 10px;border-radius:999px;background:var(--card2);border:1px solid var(--line);color:var(--muted);cursor:pointer}.chips span.new{border-style:dashed;color:var(--acc)}.chips span.on{background:var(--acc);color:#151004;border-color:var(--acc)}
 .btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;font:inherit;font-weight:700;font-size:16px;cursor:pointer;background:var(--card2);color:var(--txt);border:1px solid var(--line)}
 .btn.primary{background:var(--acc);color:#151004;border-color:var(--acc)}
 .note{color:var(--muted);font-size:13px}
@@ -49,11 +50,13 @@ input:focus{border-color:var(--acc)}
       <label>Szukaj pozycji</label><input id="q" placeholder="np. gin, limonki, kubki…">
       <p class="note" style="margin:10px 0 0">Wpisz aktualny stan — zapisuje się samo po wyjściu z pola. Puste = nie liczono. Ikona 📷 przy pozycji = zrób zdjęcie telefonem (zapisze się w bazie). Na koniec kliknij „Zapisz remanent”.</p>
     </div>
-    <details class="card">
+    <details class="card" id="addBox">
       <summary style="cursor:pointer;font-weight:700">＋ Dodaj nową pozycję (czego nie ma na liście)</summary>
-      <div class="grid2" style="margin-top:8px">
-        <div><label>Kategoria</label><input id="n_cat" list="catList" placeholder="np. CHECK LIST"><datalist id="catList"></datalist></div>
-        <div><label>Jednostka</label><input id="n_unit" placeholder="szt. / bt / kg / l" value="szt."></div>
+      <label>Kategoria — kliknij istniejącą albo wpisz nową nazwę (powstanie nowa kategoria)</label>
+      <div class="chips" id="catChips"></div>
+      <div class="grid2">
+        <div><input id="n_cat" list="catList" placeholder="np. SPRZĘT BAROWY"><datalist id="catList"></datalist></div>
+        <div><input id="n_unit" placeholder="jednostka: szt. / bt / kg / l" value="szt."></div>
       </div>
       <label>Nazwa</label><input id="n_name" placeholder="np. Termoboksy">
       <label>Stan teraz</label><input id="n_stock" type="number" inputmode="decimal" step="any" placeholder="ile jest">
@@ -62,7 +65,7 @@ input:focus{border-color:var(--acc)}
     <div id="list"></div>
   </div>
 </div>
-<div class="sticky hidden" id="bar"><div class="in"><button class="btn primary" id="snap">✔ Zapisz remanent</button></div></div>
+<div class="sticky hidden" id="bar"><div class="in"><button class="btn" id="goAdd" style="flex:0 0 46%">＋ Nowa pozycja</button><button class="btn primary" id="snap">✔ Zapisz remanent</button></div></div>
 <div class="toast" id="toast"></div>
 <script>
 const SUPABASE_URL='https://zqpqjgxtefzojhjglppb.supabase.co', SUPABASE_KEY='sb_publishable__bPrQF9K35vs8RbLdWBRXQ_VBVj2esQ';
@@ -99,6 +102,14 @@ function render(){
   });
 }
 $('q').oninput=render;
+const SUGGEST=['SPRZĘT BAROWY','DEKORACJE','MEBLE / MODUŁY','ELEKTRYKA','CHEMIA / CZYSTOŚĆ'];
+function renderCatChips(){
+  const have=[...new Set(ITEMS.map(i=>i.category))]; const cur=$('n_cat').value.trim().toUpperCase();
+  $('catChips').innerHTML=have.map(c=>`<span data-c="${esc(c)}" class="${c.toUpperCase()===cur?'on':''}">${esc(c)}</span>`).join('')+SUGGEST.filter(s=>!have.some(h=>h.toUpperCase()===s)).map(s=>`<span data-c="${esc(s)}" class="new ${s===cur?'on':''}">＋ ${esc(s)}</span>`).join('');
+  $('catChips').querySelectorAll('span').forEach(el=>el.onclick=()=>{ $('n_cat').value=el.dataset.c; renderCatChips(); $('n_name').focus(); });
+}
+$('n_cat').oninput=renderCatChips;
+$('goAdd').onclick=()=>{ const d=$('addBox'); d.open=true; d.scrollIntoView({behavior:'smooth',block:'start'}); setTimeout(()=>$('n_name').focus(),350); };
 $('list').addEventListener('change', async ev=>{
   const inp=ev.target; if(!inp.dataset.photo||!inp.files||!inp.files[0]) return;
   const it=ITEMS.find(x=>x.id===inp.dataset.photo); const box=inp.closest('.ph'); box.classList.add('busy');
@@ -109,8 +120,8 @@ $('list').addEventListener('change', async ev=>{
 $('n_add').onclick=async()=>{
   const name=$('n_name').value.trim(); if(!name){ alert('Podaj nazwę pozycji.'); return; }
   try{ await rpc('stock_add',{p_key:key,p_category:$('n_cat').value.trim()||'INNE',p_name:name,p_unit:$('n_unit').value.trim()||'szt.',p_stock:$('n_stock').value===''?null:Number($('n_stock').value),p_by:$('who').value.trim()});
-    ITEMS=await rpc('stock_list',{p_key:key}); $('catList').innerHTML=[...new Set(ITEMS.map(i=>i.category))].map(c=>`<option value="${esc(c)}">`).join(''); render();
-    $('n_name').value=''; $('n_stock').value=''; toast('Dodano: '+name); }
+    ITEMS=await rpc('stock_list',{p_key:key}); $('catList').innerHTML=[...new Set(ITEMS.map(i=>i.category))].map(c=>`<option value="${esc(c)}">`).join(''); render(); renderCatChips();
+    $('n_name').value=''; $('n_stock').value=''; toast('Dodano: '+name); $('n_name').focus(); }
   catch(e){ alert('Nie udało się dodać pozycji.'); }
 };
 $('snap').onclick=async()=>{
@@ -122,7 +133,7 @@ $('snap').onclick=async()=>{
 (async()=>{
   if(!key){ $('loading').classList.add('hidden'); $('invalid').classList.remove('hidden'); return; }
   try{ ITEMS=await rpc('stock_list',{p_key:key}); }catch(e){ $('loading').classList.add('hidden'); $('invalid').classList.remove('hidden'); return; }
-  $('loading').classList.add('hidden'); $('app').classList.remove('hidden'); $('bar').classList.remove('hidden'); $('catList').innerHTML=[...new Set(ITEMS.map(i=>i.category))].map(c=>`<option value="${esc(c)}">`).join(''); render();
+  $('loading').classList.add('hidden'); $('app').classList.remove('hidden'); $('bar').classList.remove('hidden'); $('catList').innerHTML=[...new Set(ITEMS.map(i=>i.category))].map(c=>`<option value="${esc(c)}">`).join(''); render(); renderCatChips();
 })();
 </script>
 </body>
