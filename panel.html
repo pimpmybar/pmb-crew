@@ -63,7 +63,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
 <div id="appView" class="hidden">
   <div class="top">
     <div class="logo">PIMP MY BAR <span>CREW</span></div>
-    <div class="tabs"><button data-t="events" class="on">Eventy</button><button data-t="people">Ludzie</button><button data-t="shop">Zakupy</button><button data-t="settings">Ustawienia</button></div>
+    <div class="tabs"><button data-t="events" class="on">Eventy</button><button data-t="people">Ludzie</button><button data-t="menu">Menu</button><button data-t="shop">Zakupy</button><button data-t="settings">Ustawienia</button></div>
     <div class="sp"></div>
     <button class="btn sm" id="themeBtn" title="Jasny / ciemny motyw">◐</button> <button class="btn sm" id="logout">Wyloguj</button>
   </div>
@@ -151,7 +151,13 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
                 <div><label>Klisza / branding</label><input id="g_branding" placeholder="np. klisza klienta SKODA, zielone tło"></div>
               </div>
               <label>Transport (kto z kim, o której wyjazd)</label><textarea id="g_transport"></textarea>
-              <label>Menu / receptury</label><textarea id="g_menu" style="min-height:120px"></textarea>
+              <label>Menu / receptury <button class="btn sm" id="g_menuPick" type="button" style="margin-left:8px">+ Wstaw z biblioteki</button></label>
+              <div id="g_menuPicker" class="hidden" style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;max-height:260px;overflow:auto;background:var(--card2)">
+                <input id="g_menuSearch" placeholder="Szukaj koktajlu…" style="margin-bottom:8px">
+                <div id="g_menuList" style="columns:2;column-gap:16px"></div>
+                <div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm primary" id="g_menuInsert" type="button">Wstaw zaznaczone</button><button class="btn sm" id="g_menuClose" type="button">Zamknij</button></div>
+              </div>
+              <textarea id="g_menu" style="min-height:120px"></textarea>
               <label>Uwagi</label><textarea id="g_notes"></textarea>
               <div class="check"><input type="checkbox" id="g_pub"><label style="margin:0">Agenda opublikowana (widoczna pod linkami)</label></div>
               <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center">
@@ -285,6 +291,41 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
     </div>
 
     <!-- ===== ZAKUPY ===== -->
+    <!-- ===== MENU / RECEPTURY ===== -->
+    <div id="t_menu" class="hidden">
+      <div class="grid2" style="display:grid;grid-template-columns:minmax(280px,1fr) minmax(320px,1.4fr);gap:14px;align-items:start">
+        <div class="card">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><h2 style="margin:0;flex:1">Biblioteka menu</h2><button class="btn sm primary" id="r_new">+ Nowa pozycja</button></div>
+          <input id="r_search" placeholder="Szukaj (nazwa, składnik)…" style="margin-bottom:10px">
+          <div id="r_list" class="muted">Ładowanie…</div>
+        </div>
+        <div class="card" id="r_editor">
+          <h2>Pozycja menu</h2>
+          <p class="muted" id="r_hint" style="margin-top:0">Kliknij pozycję po lewej albo dodaj nową. Te dane widzi barman (skład + manual) i trafiają na kartę menu dla gości (składniki + opis).</p>
+          <div id="r_form" class="hidden">
+            <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+              <div><label>Nazwa</label><input id="r_name"></div>
+              <div><label>Kategoria</label><input id="r_cat" list="r_cats"><datalist id="r_cats"></datalist></div>
+            </div>
+            <label>Inne nazwy (po przecinku — do rozpoznawania w menu eventu)</label><input id="r_aliases" placeholder="np. Porn Star Martini, Porn-Star Martini">
+            <label>Składniki dla gości (karta menu)</label><input id="r_ing">
+            <label>Opis dla gości (1 zdanie)</label><input id="r_descr">
+            <label>Skład z miarami (dla barmana)</label><textarea id="r_recipe" style="min-height:60px"></textarea>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+              <div><label>Szkło</label><input id="r_glass"></div><div><label>Lód</label><input id="r_ice"></div><div><label>Garnish</label><input id="r_garnish"></div>
+            </div>
+            <label>Manual — jak przygotować</label><textarea id="r_method" style="min-height:90px"></textarea>
+            <div style="display:flex;gap:16px;align-items:center;margin-top:8px">
+              <label class="check" style="margin:0"><input type="checkbox" id="r_mock"> bezalkoholowy (MOCKTAIL)</label>
+              <label class="check" style="margin:0"><input type="checkbox" id="r_active" checked> aktywna</label>
+              <div><label style="margin:0 0 2px">Kolejność</label><input id="r_sort" type="number" style="width:80px;padding:5px 8px"></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:14px;align-items:center"><button class="btn primary" id="r_save">Zapisz</button><button class="btn danger" id="r_del">Usuń</button><span class="muted" id="r_msg"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="t_shop" class="hidden">
       <div class="card">
         <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
@@ -382,8 +423,8 @@ async function api(method, path, body, prefer){
 /* ---------- TABS ---------- */
 document.querySelectorAll('.top .tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.top .tabs button').forEach(x=>x.classList.toggle('on',x===b));
-  ['events','people','shop','settings'].forEach(t=>$('t_'+t).classList.toggle('hidden',t!==b.dataset.t));
-  if(b.dataset.t==='shop') loadShop();
+  ['events','people','menu','shop','settings'].forEach(t=>$('t_'+t).classList.toggle('hidden',t!==b.dataset.t));
+  if(b.dataset.t==='shop') loadShop(); if(b.dataset.t==='menu') loadRecipes();
   if(b.dataset.t==='people') loadPeople(); if(b.dataset.t==='settings') loadSettings();
 });
 document.querySelectorAll('#evPane .tabs button').forEach(b=>b.onclick=()=>{
@@ -670,6 +711,60 @@ $('s_clear').onclick=async()=>{
 /* ---------- MOTYW ---------- */
 if(localStorage.getItem('pmb_theme')==='light') document.documentElement.classList.add('light');
 $('themeBtn').onclick=()=>{ const l=document.documentElement.classList.toggle('light'); localStorage.setItem('pmb_theme', l?'light':'dark'); };
+
+/* ---------- MENU / RECEPTURY ---------- */
+let RCP=[], curR=null;
+async function loadRecipes(){
+  try{ RCP = await api('GET','recipes?select=*&order=category,sort,name'); }
+  catch(e){ $('r_list').textContent='Uruchom update17.sql w Supabase, żeby włączyć bibliotekę menu.'; return; }
+  $('r_cats').innerHTML=[...new Set(RCP.map(r=>r.category))].map(c=>`<option value="${esc(c)}">`).join('');
+  renderRecipes();
+}
+function renderRecipes(){
+  const q=($('r_search').value||'').toLowerCase();
+  const rows=RCP.filter(r=>!q||(r.name+' '+(r.ing_short||'')+' '+(r.recipe||'')+' '+(r.aliases||'')).toLowerCase().includes(q));
+  let cat=null, html='';
+  rows.forEach(r=>{ if(r.category!==cat){cat=r.category; html+=`<h2 style="margin:12px 0 4px;color:var(--acc)">${esc(cat)}</h2>`;}
+    html+=`<div class="evitem ${curR&&curR.id===r.id?'on':''}" data-r="${r.id}" style="padding:8px 10px;margin-bottom:4px;${r.active===false?'opacity:.5':''}"><b style="font-size:14px">${esc(r.name)}${r.is_mock?' <span class="pill">0%</span>':''}</b><small>${esc(r.ing_short||'')}</small></div>`; });
+  $('r_list').innerHTML=html||'<p class="muted">Brak pozycji.</p>';
+  $('r_list').querySelectorAll('[data-r]').forEach(el=>el.onclick=()=>editRecipe(el.dataset.r));
+}
+function editRecipe(id){
+  curR = id ? RCP.find(r=>r.id===id) : {category:'',sort:0,name:'',aliases:'',ing_short:'',descr:'',recipe:'',glass:'',ice:'',garnish:'',method:'',is_mock:false,active:true};
+  const r=curR; $('r_form').classList.remove('hidden'); $('r_hint').classList.add('hidden');
+  $('r_name').value=r.name||''; $('r_cat').value=r.category||''; $('r_aliases').value=r.aliases||''; $('r_ing').value=r.ing_short||''; $('r_descr').value=r.descr||'';
+  $('r_recipe').value=r.recipe||''; $('r_glass').value=r.glass||''; $('r_ice').value=r.ice||''; $('r_garnish').value=r.garnish||''; $('r_method').value=r.method||'';
+  $('r_mock').checked=!!r.is_mock; $('r_active').checked=r.active!==false; $('r_sort').value=r.sort??0; $('r_del').style.display=r.id?'':'none'; $('r_msg').textContent='';
+  renderRecipes();
+}
+$('r_search').oninput=renderRecipes;
+$('r_new').onclick=()=>editRecipe(null);
+$('r_save').onclick=async()=>{
+  const body={name:$('r_name').value.trim(),category:$('r_cat').value.trim()||'INNE',aliases:$('r_aliases').value.trim()||null,ing_short:$('r_ing').value.trim(),descr:$('r_descr').value.trim(),
+    recipe:$('r_recipe').value.trim(),glass:$('r_glass').value.trim(),ice:$('r_ice').value.trim(),garnish:$('r_garnish').value.trim(),method:$('r_method').value.trim(),
+    is_mock:$('r_mock').checked,active:$('r_active').checked,sort:Number($('r_sort').value||0)};
+  if(!body.name){ $('r_msg').textContent='Podaj nazwę.'; return; }
+  try{ if(curR.id){ await api('PATCH',`recipes?id=eq.${curR.id}`,body,'return=minimal'); } else { const [n]=await api('POST','recipes',body); curR=n; }
+    toast('Zapisano'); await loadRecipes(); if(curR&&curR.id) editRecipe(curR.id); }
+  catch(e){ $('r_msg').textContent='Błąd: '+e.message; }
+};
+$('r_del').onclick=async()=>{ if(!curR||!curR.id) return; if(!confirm('Usunąć „'+curR.name+'” z biblioteki?')) return; await api('DELETE',`recipes?id=eq.${curR.id}`,null,'return=minimal'); curR=null; $('r_form').classList.add('hidden'); $('r_hint').classList.remove('hidden'); toast('Usunięto'); loadRecipes(); };
+
+/* wstawianie z biblioteki do menu eventu */
+$('g_menuPick').onclick=async()=>{ if(!RCP.length) await loadRecipes(); $('g_menuPicker').classList.toggle('hidden'); renderMenuPicker(); };
+$('g_menuClose').onclick=()=>$('g_menuPicker').classList.add('hidden');
+$('g_menuSearch').oninput=()=>renderMenuPicker();
+function renderMenuPicker(){
+  const q=($('g_menuSearch').value||'').toLowerCase(); let cat=null, html='';
+  RCP.filter(r=>r.active!==false&&(!q||r.name.toLowerCase().includes(q))).forEach(r=>{ if(r.category!==cat){cat=r.category; html+=`<div style="break-inside:avoid;font-size:11px;color:var(--acc);font-weight:700;margin:8px 0 3px">${esc(cat)}</div>`;}
+    html+=`<label class="check" style="margin:2px 0;break-inside:avoid;font-size:13px"><input type="checkbox" data-pick="${r.id}"> ${esc(r.name)}</label>`; });
+  $('g_menuList').innerHTML=html;
+}
+$('g_menuInsert').onclick=()=>{
+  const ids=[...$('g_menuList').querySelectorAll('[data-pick]:checked')].map(c=>c.dataset.pick); if(!ids.length) return;
+  const lines=ids.map(id=>{ const r=RCP.find(x=>x.id===id); return `${r.name} — ${r.recipe||r.ing_short||''}`; });
+  const ta=$('g_menu'); ta.value=(ta.value.trim()?ta.value.replace(/\s+$/,'')+'\n':'')+lines.join('\n'); $('g_menuPicker').classList.add('hidden'); toast(ids.length+' pozycji wstawiono — pamiętaj Zapisz');
+};
 
 /* ---------- SETTINGS ---------- */
 $('set_save').onclick=()=>{ localStorage.setItem('pmb_crew_url',$('set_url').value.trim()); toast('Zapisano'); loadSettings(); };
