@@ -382,6 +382,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
           <button class="btn sm" data-mv="all">Cały katalog</button>
         </div>
         <p class="muted" style="margin-top:0">Nazwę i kategorię poprawiasz wprost w tabeli (zapisuje się samo). „Scal” przenosi pozycję do innej (agendy i eventy przepinają się na tę drugą). „Ukryj” chowa pozycję z list, nie kasuje historii.</p>
+        <div id="m_suggest"></div>
         <input id="m_q" placeholder="Szukaj…" style="margin-bottom:8px;max-width:300px">
         <div style="overflow-x:auto"><div id="m_table" class="muted">Wybierz widok powyżej.</div></div>
       </div>
@@ -812,7 +813,7 @@ function renderShop(){
     gShown.add(g);
     const gStock=CAT.filter(c=>c.group_name===g).reduce((a,c)=>a+Number(c.stock||0),0);
     const realOrder=Math.max((gNeed[g]||0)-gStock,0);
-    const list=others.map(c=>`<b>${esc(c.name)}</b> — ${fmtN(Number(c.stock))} ${esc(c.unit||'')}${c.price!=null?` (${fmtN(Number(c.price))} zł)`:''}`).join(' · ');
+    const list=others.map(c=>`<b>${esc(c.name)}</b> — ${fmtN(Number(c.stock))} ${esc(c.unit||'')}${c.price!=null?` (${fmtN(Number(c.price))} zł)`:''} <button class="btn sm" data-sub="${r.c.id}|${c.id}" title="Podmień „${esc(r.c.name)}” na „${esc(c.name)}” w agendach eventów z tego zakresu">Podstaw</button>`).join(' &nbsp; ');
     return `<tr><td colspan="${colspan}" style="padding:6px 10px 10px;border-left:3px solid var(--acc)"><span style="color:var(--acc);font-weight:700">⇄ ${esc(g)}</span> <span class="muted">— masz w grupie:</span> ${list}<br><span class="muted">Cała grupa: potrzeba ${fmtN(gNeed[g]||0)} · stan ${fmtN(gStock)} → realnie do kupienia: </span><b style="color:${realOrder>0?'var(--acc)':'var(--ok)'}">${realOrder>0?fmtN(realOrder):'nic — podstaw z grupy'}</b></td></tr>`;
   };
   let cat=null, html=`<table><thead><tr><th>Pozycja</th><th>Jedn.</th>${evs.map(e=>`<th title="${esc(e.name)}">${esc(e.name.slice(0,14))}<br><span class="muted">${e.event_date.slice(5)}</span></th>`).join('')}<th class="right">Razem</th><th class="right" style="width:90px">Stan</th><th class="right">Do zamówienia</th></tr></thead><tbody>`;
@@ -821,6 +822,16 @@ function renderShop(){
     if(r.order>0) html+=groupHint(r,evs.length+5); });
   html+='</tbody></table>'; $('s_table').innerHTML = SHOP.rows.length? html : '<p class="muted">Nic do zamówienia.</p>';
   $('s_table').querySelectorAll('[data-stock]').forEach(i=>i.onchange=async()=>{ const c=CAT.find(x=>x.id===i.dataset.stock); c.stock=i.value===''?null:Number(i.value); await api('PATCH',`catalog?id=eq.${c.id}`,{stock:c.stock,stock_updated_at:new Date().toISOString()},'return=minimal'); renderShop(); toast('Stan zapisany'); });
+  $('s_table').querySelectorAll('[data-sub]').forEach(b=>b.onclick=async()=>{
+    const [srcId,tgtId]=b.dataset.sub.split('|');
+    const src=CAT.find(x=>x.id===srcId), tgt=CAT.find(x=>x.id===tgtId);
+    const hit=SHOP.items.filter(i=>i.catalog_id===srcId);
+    const evNames=[...new Set(hit.map(i=>SHOP.events.find(e=>e.id===i.event_id)?.name).filter(Boolean))];
+    const total=hit.reduce((a,i)=>a+Number(i.qty_num||0),0);
+    if(!confirm(`Podmieniam „${src.name}” na „${tgt.name}” (łącznie ${fmtN(total)} ${tgt.unit||''}) w eventach:\n• ${evNames.join('\n• ')}\n\nBarmani w agendzie zobaczą już „${tgt.name}”. Kontynuować?`)) return;
+    await api('PATCH',`packing_items?catalog_id=eq.${srcId}&event_id=in.(${SHOP.events.map(e=>e.id).join(',')})`,{catalog_id:tgt.id,name:tgt.name,category:tgt.category,unit:tgt.unit},'return=minimal');
+    toast('Podstawiono — agendy zaktualizowane'); await runShop();
+  });
 }
 $('s_run').onclick=runShop; $('s_onlyOrder').onchange=renderShop; $('s_from').onchange=runShop; $('s_to').onchange=runShop;
 $('s_thisWeek').onclick=()=>{ setWeek(0); runShop(); }; $('s_nextWeek').onclick=()=>{ setWeek(1); runShop(); };
@@ -863,6 +874,57 @@ $('s_clear').onclick=async()=>{
 /* ---------- MAGAZYN: przegląd / porządkowanie ---------- */
 let MV='today';
 const mNorm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+/* --- wykrywanie duplikatów po słowach (np. „RUM GOSSLING” ↔ „Gosling's Gold Seal Bermuda”) --- */
+const M_UNITS=new Set(['l','ml','g','kg','szt','bt','but','paczka','opak','x']);
+const M_GENERIC=new Set(['wodka','gin','rum','whisky','whiskey','burbon','bourbon','tequila','tequilla','prosseco','prosecco','wino','likier','sok','syrop','woda','lod','kawa']);
+const mSyn=t=>({'bezalkoholowy':'zero','bezalkoholowe':'zero'})[t]||t;
+function mTokens(name){
+  return String(name||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/0\s*%/g,' zero ').replace(/[^a-z0-9]+/g,' ')
+    .split(' ').map(mSyn).filter(t=>t && !M_UNITS.has(t) && !/^\d+$/.test(t));
+}
+function mEd1(a,b){ // czy słowa różnią się o max 1 literę (gossling/goslings)
+  if(a===b) return true; if(Math.abs(a.length-b.length)>1) return false;
+  let i=0,j=0,d=0; while(i<a.length&&j<b.length){ if(a[i]===b[j]){i++;j++;continue;} d++; if(d>1)return false; if(a.length>b.length)i++; else if(b.length>a.length)j++; else {i++;j++;} }
+  return d+(a.length-i)+(b.length-j)<=1;
+}
+function mIgnored(){ try{ return new Set(JSON.parse(localStorage.getItem('pmb_mergeIgnore')||'[]')); }catch(e){ return new Set(); } }
+function mSuggest(){
+  const act=CAT.filter(c=>c.active!==false), ign=mIgnored(), out=[], seen=new Set();
+  const toks=act.map(c=>mTokens(c.name));
+  for(let i=0;i<act.length;i++) for(let j=i+1;j<act.length;j++){
+    const a=act[i], b=act[j], key=[a.id,b.id].sort().join('|');
+    if(ign.has(key)||seen.has(key)) continue;
+    const ta=toks[i], tb=toks[j];
+    const shared=ta.filter(x=>tb.some(y=>x.length>=3&&y.length>=3&&(x.length>=5?mEd1(x,y):x===y)));
+    const sameSet = ta.length&&tb.length && ta.every(x=>tb.some(y=>mEd1(x,y))) && tb.every(y=>ta.some(x=>mEd1(x,y)));
+    const grpHit = a.group_name && a.group_name===b.group_name && shared.some(t=>!M_GENERIC.has(t));
+    const exact = mNorm(a.name)===mNorm(b.name);
+    if(exact||sameSet||grpHit){ seen.add(key); out.push([a,b]); }
+  }
+  return out;
+}
+async function doMerge(src,tgt){
+  const newStock = src.stock!=null ? (tgt.stock??0)+Number(src.stock) : tgt.stock;
+  if(!confirm(`Scalam „${src.name}” → „${tgt.name}”.\nAgendy i eventy przepinam na „${tgt.name}”.\nStan po scaleniu: ${newStock??'—'} (${tgt.stock??0} + ${src.stock??0}).\nKontynuować?`)) return;
+  await api('PATCH',`packing_items?catalog_id=eq.${src.id}`,{catalog_id:tgt.id,name:tgt.name,category:tgt.category,unit:tgt.unit},'return=minimal');
+  if(src.stock!=null) await api('PATCH',`catalog?id=eq.${tgt.id}`,{stock:newStock,stock_updated_at:new Date().toISOString()},'return=minimal');
+  await api('DELETE',`catalog?id=eq.${src.id}`,null,'return=minimal');
+  toast('Scalono'); await loadCatalog(); renderMag(); renderShop();
+}
+function renderSuggest(){
+  const pairs=mSuggest();
+  $('m_suggest').innerHTML = pairs.length? `<div style="border:1px solid var(--acc);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+    <b style="color:var(--acc)">Wygląda na duplikaty — scalić?</b>
+    ${pairs.map(([a,b],i)=>`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+      <span><b>${esc(a.name)}</b> <span class="muted">(${a.stock??'—'} ${esc(a.unit||'')})</span> ↔ <b>${esc(b.name)}</b> <span class="muted">(${b.stock??'—'} ${esc(b.unit||'')})</span></span>
+      <button class="btn sm" data-sga="${i}">Scal → zostaw „${esc(b.name.slice(0,22))}”</button>
+      <button class="btn sm" data-sgb="${i}">Scal → zostaw „${esc(a.name.slice(0,22))}”</button>
+      <button class="btn sm" data-sgx="${i}" title="Nie pokazuj więcej tej pary">✕ to nie duplikat</button>
+    </div>`).join('')}</div>` : '';
+  $('m_suggest').querySelectorAll('[data-sga]').forEach(x=>x.onclick=()=>doMerge(pairs[x.dataset.sga][0],pairs[x.dataset.sga][1]));
+  $('m_suggest').querySelectorAll('[data-sgb]').forEach(x=>x.onclick=()=>doMerge(pairs[x.dataset.sgb][1],pairs[x.dataset.sgb][0]));
+  $('m_suggest').querySelectorAll('[data-sgx]').forEach(x=>x.onclick=()=>{ const [a,b]=pairs[x.dataset.sgx]; const ig=[...mIgnored()]; ig.push([a.id,b.id].sort().join('|')); localStorage.setItem('pmb_mergeIgnore',JSON.stringify(ig)); renderSuggest(); });
+}
 function mDupes(){
   const groups={};
   CAT.forEach(c=>{ const k=mNorm(c.name); (groups[k]=groups[k]||[]).push(c); });
@@ -875,6 +937,7 @@ function mDupes(){
 }
 async function renderMag(){
   if(!CAT.length) await loadCatalog();
+  renderSuggest();
   const q=($('m_q').value||'').toLowerCase(); const today=new Date().toISOString().slice(0,10);
   const dup=MV==='dupes'?mDupes():null;
   let rows=CAT.filter(c=>{
@@ -912,11 +975,7 @@ async function renderMag(){
     const matches=CAT.filter(x=>x.id!==src.id&&x.name.toLowerCase().includes(pick.trim().toLowerCase()));
     if(!matches.length){ alert('Nie znalazłem takiej pozycji.'); return; }
     const tgt=matches[0];
-    if(!confirm(`Scalam „${src.name}” → „${tgt.name}”.\nWszystkie agendy przepinam na „${tgt.name}”. Stan docelowy: ${tgt.stock??'—'} (stan „${src.name}”: ${src.stock??'—'}).\nKontynuować?`)) return;
-    await api('PATCH',`packing_items?catalog_id=eq.${src.id}`,{catalog_id:tgt.id,name:tgt.name,category:tgt.category,unit:tgt.unit},'return=minimal');
-    if((tgt.stock==null)&&src.stock!=null) await api('PATCH',`catalog?id=eq.${tgt.id}`,{stock:src.stock,stock_updated_at:new Date().toISOString()},'return=minimal');
-    await api('DELETE',`catalog?id=eq.${src.id}`,null,'return=minimal');
-    toast('Scalono'); await loadCatalog(); renderMag(); renderShop();
+    await doMerge(src,tgt);
   });
 }
 document.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{ MV=b.dataset.mv; document.querySelectorAll('[data-mv]').forEach(x=>x.style.fontWeight=x===b?'700':''); renderMag(); });
