@@ -40,6 +40,15 @@ svg.corner{position:absolute;width:50px;height:50px;opacity:.5}
 const SUPABASE_URL='https://zqpqjgxtefzojhjglppb.supabase.co', SUPABASE_KEY='sb_publishable__bPrQF9K35vs8RbLdWBRXQ_VBVj2esQ';
 const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const Q=new URLSearchParams(location.search), evId=Q.get('id'), token=Q.get('t');
+async function freshSession(){
+  let s=null; try{ s=JSON.parse(localStorage.getItem('pmb_session')||'null'); }catch(e){}
+  if(!s) return null;
+  if(s.expires_at*1000 - Date.now() > 60000) return s;
+  try{
+    const r=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,{method:'POST',headers:{'apikey':SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:s.refresh_token})});
+    if(!r.ok) return null; s=await r.json(); localStorage.setItem('pmb_session',JSON.stringify(s)); return s;
+  }catch(e){ return null; }
+}
 
 /* ===== BIBLIOTEKA PMB (z Menu Buildera v13) ===== */
 const LIB=[
@@ -175,8 +184,8 @@ function toggles(){
       const d=await r.json(); if(!d||!d.agenda){ $('loading').textContent='Menu będzie dostępne po akceptacji eventu.'; return; }
       menuTxt=d.agenda.menu||''; label=`${d.event.name} · ${d.event.event_date}`;
     } else if(evId){
-      const sess=JSON.parse(localStorage.getItem('pmb_session')||'null');
-      if(!sess){ $('loading').textContent='Otwórz menu z panelu (wymaga zalogowania).'; return; }
+      const sess=await freshSession();
+      if(!sess){ $('loading').innerHTML='Sesja wygasła albo nie jesteś zalogowany — <a href="panel.html">zaloguj się w panelu</a> i otwórz menu ponownie.'; return; }
       const r=await fetch(`${SUPABASE_URL}/rest/v1/events?id=eq.${evId}&select=name,event_date,menu`,{headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+sess.access_token}});
       const [e]=await r.json(); if(!e){ $('loading').textContent='Nie znaleziono eventu.'; return; }
       menuTxt=e.menu||''; label=`${e.name} · ${e.event_date}`; EV=e;
