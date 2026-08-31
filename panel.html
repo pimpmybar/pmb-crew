@@ -220,7 +220,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
               <div class="card" style="margin:12px 0 0;background:var(--card2)">
                 <h2>Dodaj pozycję do katalogu (będzie w każdej agendzie)</h2>
                 <div class="grid g4">
-                  <div><label>Kategoria</label><input id="q_cat" list="catList" placeholder="np. OWOCE"><datalist id="catList"></datalist></div>
+                  <div><label>Kategoria</label><input id="q_cat" list="catList" placeholder="np. OWOCE"><datalist id="catList"></datalist><datalist id="grpList"></datalist></div>
                   <div><label>Nazwa</label><input id="q_name"></div>
                   <div><label>Jednostka</label><select id="q_unit"><option>szt.</option><option>bt</option><option>l</option><option>kg</option><option>g</option><option>opak.</option></select></div>
                   <div><label>Stan magazynu</label><input id="q_stock" type="number"></div>
@@ -683,7 +683,10 @@ $('a_add').onclick = async()=>{
 
 /* ---------- CATALOG / QUANTITIES ---------- */
 let CAT=[];
-async function loadCatalog(){ CAT = await api('GET','catalog?select=*&active=eq.true&order=category,sort,name'); $('catList').innerHTML=[...new Set(CAT.map(c=>c.category))].map(c=>`<option value="${esc(c)}">`).join(''); }
+async function loadCatalog(){ CAT = await api('GET','catalog?select=*&active=eq.true&order=category,sort,name'); $('catList').innerHTML=[...new Set(CAT.map(c=>c.category))].map(c=>`<option value="${esc(c)}">`).join('');
+  const grps=[...new Set([...CAT.map(c=>c.group_name).filter(Boolean),'WÓDKA','GIN','TEQUILA','RUM','WHISKY','PROSECCO','LIKIERY'])].sort();
+  const gl=document.getElementById('grpList'); if(gl) gl.innerHTML=grps.map(g=>`<option value="${esc(g)}">`).join('');
+}
 function fmtN(n){ return n==null?'':Number(n).toLocaleString('pl-PL',{maximumFractionDigits:2}); }
 function renderGrid(){
   const q=$('q_search').value.toLowerCase(), only=$('q_onlyFilled').checked;
@@ -799,9 +802,23 @@ function renderShop(){
   const only=$('s_onlyOrder').checked; const evs=SHOP.events;
   SHOP.rows = CAT.map(c=>{ const per=evs.map(e=>SHOP.items.filter(i=>i.event_id===e.id&&i.catalog_id===c.id).reduce((a,i)=>a+Number(i.qty_num||0),0)); const need=per.reduce((a,b)=>a+b,0); const stock=c.stock==null?0:Number(c.stock); return {c,per,need,stock,order:Math.max(need-stock,0)}; })
     .filter(r=>r.need>0 || (!only && r.stock>0)).filter(r=>!only || r.order>0);
+  // grupy zamienników: potrzeba i stan liczone dla całej grupy (np. WÓDKA)
+  const gNeed={}, gShown=new Set();
+  SHOP.rows.forEach(r=>{ const g=r.c.group_name; if(g) gNeed[g]=(gNeed[g]||0)+r.need; });
+  const groupHint=(r,colspan)=>{
+    const g=r.c.group_name; if(!g||gShown.has(g)) return '';
+    const others=CAT.filter(c=>c.group_name===g&&c.id!==r.c.id&&Number(c.stock||0)>0);
+    if(!others.length) return '';
+    gShown.add(g);
+    const gStock=CAT.filter(c=>c.group_name===g).reduce((a,c)=>a+Number(c.stock||0),0);
+    const realOrder=Math.max((gNeed[g]||0)-gStock,0);
+    const list=others.map(c=>`<b>${esc(c.name)}</b> — ${fmtN(Number(c.stock))} ${esc(c.unit||'')}${c.price!=null?` (${fmtN(Number(c.price))} zł)`:''}`).join(' · ');
+    return `<tr><td colspan="${colspan}" style="padding:6px 10px 10px;border-left:3px solid var(--acc)"><span style="color:var(--acc);font-weight:700">⇄ ${esc(g)}</span> <span class="muted">— masz w grupie:</span> ${list}<br><span class="muted">Cała grupa: potrzeba ${fmtN(gNeed[g]||0)} · stan ${fmtN(gStock)} → realnie do kupienia: </span><b style="color:${realOrder>0?'var(--acc)':'var(--ok)'}">${realOrder>0?fmtN(realOrder):'nic — podstaw z grupy'}</b></td></tr>`;
+  };
   let cat=null, html=`<table><thead><tr><th>Pozycja</th><th>Jedn.</th>${evs.map(e=>`<th title="${esc(e.name)}">${esc(e.name.slice(0,14))}<br><span class="muted">${e.event_date.slice(5)}</span></th>`).join('')}<th class="right">Razem</th><th class="right" style="width:90px">Stan</th><th class="right">Do zamówienia</th></tr></thead><tbody>`;
   SHOP.rows.forEach(r=>{ if(r.c.category!==cat){ cat=r.c.category; html+=`<tr><td colspan="${evs.length+5}" style="color:var(--acc);font-weight:700;padding-top:12px">${esc(cat)}</td></tr>`; }
-    html+=`<tr><td>${esc(r.c.name)}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="right muted">${v?fmtN(v):''}</td>`).join('')}<td class="right"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right"></td><td class="right" style="color:${r.order>0?'var(--acc)':'var(--muted)'};font-weight:700">${r.order>0?fmtN(r.order):'—'}</td></tr>`; });
+    html+=`<tr><td>${esc(r.c.name)}${r.c.group_name?` <span class="muted" style="font-size:11px">⇄ ${esc(r.c.group_name)}</span>`:''}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="right muted">${v?fmtN(v):''}</td>`).join('')}<td class="right"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right"></td><td class="right" style="color:${r.order>0?'var(--acc)':'var(--muted)'};font-weight:700">${r.order>0?fmtN(r.order):'—'}</td></tr>`;
+    if(r.order>0) html+=groupHint(r,evs.length+5); });
   html+='</tbody></table>'; $('s_table').innerHTML = SHOP.rows.length? html : '<p class="muted">Nic do zamówienia.</p>';
   $('s_table').querySelectorAll('[data-stock]').forEach(i=>i.onchange=async()=>{ const c=CAT.find(x=>x.id===i.dataset.stock); c.stock=i.value===''?null:Number(i.value); await api('PATCH',`catalog?id=eq.${c.id}`,{stock:c.stock,stock_updated_at:new Date().toISOString()},'return=minimal'); renderShop(); toast('Stan zapisany'); });
 }
@@ -867,11 +884,13 @@ async function renderMag(){
     return true;
   });
   const catOpts=[...new Set(CAT.map(c=>c.category))];
-  $('m_table').innerHTML = rows.length? `<table><thead><tr><th style="width:44px"></th><th style="width:170px">Kategoria</th><th>Nazwa</th><th style="width:70px">Jedn.</th><th style="width:80px" class="right">Stan</th><th style="width:150px">Kto · kiedy</th><th style="width:190px" class="right">Akcje</th></tr></thead><tbody>${rows.map(c=>`
+  $('m_table').innerHTML = rows.length? `<table><thead><tr><th style="width:44px"></th><th style="width:150px">Kategoria</th><th>Nazwa</th><th style="width:110px" title="Grupa zamienników — np. WÓDKA. Pozycje z tą samą grupą podpowiadają się w Zakupach jako zamienniki.">Grupa ⇄</th><th style="width:70px" class="right" title="Cena zakupu za jednostkę (orientacyjna, zł)">Cena</th><th style="width:60px">Jedn.</th><th style="width:75px" class="right">Stan</th><th style="width:140px">Kto · kiedy</th><th style="width:180px" class="right">Akcje</th></tr></thead><tbody>${rows.map(c=>`
     <tr data-mid="${c.id}" ${c.active===false?'style="opacity:.45"':''}>
       <td>${c.photo_url?`<img src="${esc(c.photo_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td>
       <td><input data-mcat="${c.id}" value="${esc(c.category)}" list="catList" style="padding:5px 8px"></td>
       <td><input data-mname="${c.id}" value="${esc(c.name)}" style="padding:5px 8px"></td>
+      <td><input data-mgrp="${c.id}" value="${esc(c.group_name||'')}" list="grpList" placeholder="—" style="padding:5px 8px;width:100px"></td>
+      <td><input type="number" step="any" data-mprice="${c.id}" value="${c.price??''}" placeholder="zł" style="padding:5px 8px;width:62px;text-align:right"></td>
       <td><input data-munit="${c.id}" value="${esc(c.unit||'')}" style="padding:5px 8px;width:60px"></td>
       <td><input type="number" step="any" data-mstock="${c.id}" value="${c.stock??''}" style="padding:5px 8px;width:70px;text-align:right"></td>
       <td class="muted" style="font-size:12px">${c.stock_updated_by?esc(c.stock_updated_by)+' · ':''}${c.stock_updated_at?new Date(c.stock_updated_at).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—'}</td>
@@ -881,6 +900,8 @@ async function renderMag(){
   $('m_table').querySelectorAll('[data-mcat]').forEach(i=>i.onchange=()=>save(i.dataset.mcat,{category:i.value.trim()||'INNE'}));
   $('m_table').querySelectorAll('[data-mname]').forEach(i=>i.onchange=()=>save(i.dataset.mname,{name:i.value.trim()}));
   $('m_table').querySelectorAll('[data-munit]').forEach(i=>i.onchange=()=>save(i.dataset.munit,{unit:i.value.trim()}));
+  $('m_table').querySelectorAll('[data-mgrp]').forEach(i=>i.onchange=()=>save(i.dataset.mgrp,{group_name:i.value.trim().toUpperCase()||null}));
+  $('m_table').querySelectorAll('[data-mprice]').forEach(i=>i.onchange=()=>save(i.dataset.mprice,{price:i.value===''?null:Number(i.value)}));
   $('m_table').querySelectorAll('[data-mstock]').forEach(i=>i.onchange=()=>save(i.dataset.mstock,{stock:i.value===''?null:Number(i.value),stock_updated_at:new Date().toISOString()}));
   $('m_table').querySelectorAll('[data-mhide]').forEach(b=>b.onclick=async()=>{ const c=CAT.find(x=>x.id===b.dataset.mhide); await save(c.id,{active:c.active===false}); renderMag(); });
   $('m_table').querySelectorAll('[data-mmerge]').forEach(b=>b.onclick=async()=>{
