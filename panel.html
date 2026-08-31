@@ -31,6 +31,20 @@ textarea{min-height:64px;resize:vertical}
 .btn:disabled{opacity:.5}
 .grid{display:grid;gap:10px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g4{grid-template-columns:repeat(4,1fr)}
 .cols{display:grid;grid-template-columns:300px 1fr;gap:16px}
+.cols.wide{grid-template-columns:minmax(560px,1.15fr) 1fr}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card2);color:var(--muted);cursor:pointer;user-select:none;font-family:inherit}
+.chip.done{background:rgba(76,195,138,.15);color:var(--ok);border-color:rgba(76,195,138,.35)}
+.chip.auto{cursor:default;opacity:.85}
+.chip.na{opacity:.4;cursor:default;text-decoration:line-through}
+.prog{height:6px;background:var(--card2);border-radius:999px;overflow:hidden;margin:6px 0 8px}.prog i{display:block;height:100%;background:var(--ok)}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal .dh{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:center;padding:4px 0}
+.cal .d{min-height:74px;min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:8px;padding:4px;background:var(--card2);font-size:11px}
+.cal .d.out{opacity:.35}.cal .d.today{border-color:var(--acc)}
+.cal .d .n{color:var(--muted);font-weight:600;margin-bottom:3px}
+.cal .ev{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:10.5px;line-height:1.25;padding:2px 4px;border-radius:5px;margin-bottom:2px;cursor:pointer;background:rgba(232,176,75,.18);color:var(--txt);overflow:hidden;word-break:break-word}
+.cal .ev i.car{float:right;font-style:normal;font-size:9px;font-weight:700;padding:0 4px;border-radius:4px;background:rgba(0,0,0,.25);margin-left:3px}.cal .ev i.car.clash{background:var(--bad);color:#fff}
+.cal .ev.ok{background:rgba(76,195,138,.18)}.cal .ev.bad{background:rgba(229,83,75,.18);text-decoration:line-through}.cal .ev.on{outline:1px solid var(--acc)}
 @media(max-width:800px){.cols{grid-template-columns:1fr}.g3,.g4{grid-template-columns:1fr 1fr}}
 table{width:100%;border-collapse:collapse}th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
 td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
@@ -74,15 +88,27 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
       <div class="cols">
         <div>
           <div class="card">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h2 style="margin:0">Eventy</h2><button class="btn sm" id="newEvent">+ Nowy</button></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:6px;flex-wrap:wrap"><h2 style="margin:0">Eventy</h2>
+              <div style="display:flex;gap:4px"><button class="btn sm" id="viewList" style="font-weight:700">Lista</button><button class="btn sm" id="viewCal">Kalendarz</button><button class="btn sm" id="icsAll" title="Pobierz nadchodzące eventy do kalendarza (Mac / Google)">📅 .ics</button><button class="btn sm" id="newEvent">+ Nowy</button></div>
+            </div>
             <div id="evList"></div>
+            <div id="evCal" class="hidden">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><button class="btn sm" id="calPrev">‹</button><b id="calTitle" style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.05em"></b><button class="btn sm" id="calNext">›</button></div>
+              <div class="cal" id="calGrid"></div>
+              <p class="muted" style="margin:8px 0 0;font-size:12px">Kliknij event w kalendarzu, żeby go otworzyć. Zielony = potwierdzony, żółty = wstępny.</p>
+            </div>
           </div>
         </div>
         <div id="evPane" class="hidden">
           <div class="card">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-              <div><h1 id="e_title" style="margin-bottom:2px"></h1><div class="muted" id="e_sub"></div><div style="margin-top:6px;display:flex;gap:6px"><a class="btn sm primary" id="e_agendaBtn" target="_blank">Agenda PMB (podgląd / druk)</a><a class="btn sm" id="e_menuBtn" target="_blank">Menu do druku</a><a class="btn sm hidden" id="e_contractBtn" target="_blank" rel="noopener">Otwórz umowę</a></div></div>
+              <div><h1 id="e_title" style="margin-bottom:2px"></h1><div class="muted" id="e_sub"></div><div style="margin-top:6px;display:flex;gap:6px"><a class="btn sm primary" id="e_agendaBtn" target="_blank">Agenda PMB (podgląd / druk)</a><a class="btn sm" id="e_menuBtn" target="_blank">Menu do druku</a><a class="btn sm hidden" id="e_contractBtn" target="_blank" rel="noopener">Otwórz umowę</a><a class="btn sm" id="e_gcalBtn" target="_blank" rel="noopener" title="Dodaj do Kalendarza Google">+ Google Kalendarz</a></div></div>
               <div class="tabs"><button data-s="crew" class="on">Skład</button><button data-s="agenda">Agenda</button><button data-s="pack">Pakowanie</button><button data-s="edit">Dane eventu</button></div>
+            </div>
+            <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
+              <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Gotowość eventu</h2><b id="chkPct"></b></div>
+              <div class="prog"><i id="chkBar" style="width:0"></i></div>
+              <div id="chkChips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
             </div>
           </div>
 
@@ -147,7 +173,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
               </div>
               <label>Godziny pracy (eventy wielodniowe — jedna linia na dzień)</label><textarea id="g_schedule" placeholder="12.06 — 15:00–20:00&#10;13.06 — 8:00–18:00"></textarea>
               <div class="grid g2">
-                <div><label>Auto</label><input id="g_vehicle" placeholder="np. COMBO + bus"></div>
+                <div><label>Auto (COMBO / CADDY)</label><input id="g_vehicle" list="carList" placeholder="COMBO, CADDY, COMBO + CADDY…"><datalist id="carList"><option value="COMBO"><option value="CADDY"><option value="COMBO + CADDY"><option value="SPRINTER (wynajem)"><option value="COMBO + SPRINTER (wynajem)"></datalist><div class="muted" id="g_vehicleWarn" style="font-size:12px;margin-top:4px"></div></div>
                 <div><label>Klisza / branding</label><input id="g_branding" placeholder="np. klisza klienta SKODA, zielone tło"></div>
               </div>
               <label>Transport (kto z kim, o której wyjazd)</label><textarea id="g_transport"></textarea>
@@ -218,7 +244,8 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
                 <div><label>Klient</label><input id="e_client"></div>
               </div>
               <div class="grid g4">
-                <div><label>Data</label><input id="e_date" type="date"></div>
+                <div><label>Data (start)</label><input id="e_date" type="date"></div>
+                <div><label>Data zakończenia (wielodniowe)</label><input id="e_end_date" type="date"></div>
                 <div><label>Od</label><input id="e_start" placeholder="16:00"></div>
                 <div><label>Do</label><input id="e_end" placeholder="00:00"></div>
                 <div><label>Status</label><select id="e_status"><option value="wstepny">Wstępny (zapytanie)</option><option value="potwierdzony">Potwierdzony (umowa)</option><option value="zakonczony">Zakończony</option><option value="anulowany">Anulowany</option></select></div>
@@ -331,7 +358,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
         <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
           <div><label>Eventy od</label><input id="s_from" type="date" style="width:160px"></div>
           <div><label>do</label><input id="s_to" type="date" style="width:160px"></div>
-          <button class="btn primary" id="s_run">Policz</button>
+          <button class="btn primary" id="s_run">Policz</button><button class="btn" id="s_thisWeek" title="poniedziałek–niedziela">Ten tydzień</button><button class="btn" id="s_nextWeek">Następny</button>
           <label class="check" style="margin:0"><input type="checkbox" id="s_onlyOrder" checked> tylko do zamówienia</label>
           <div class="sp"></div>
           <button class="btn" id="s_copy">Kopiuj zamówienie</button><button class="btn" id="s_csv">Kopiuj jako CSV</button> <button class="btn" id="s_snap">Zapisz remanent</button><button class="btn danger" id="s_clear">Wyczyść stan</button>
@@ -373,6 +400,11 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
         <p class="muted" style="margin-top:0">Pełny adres, pod którym wisi <span class="mono">crew.html</span>. Linki dla ludzi są budowane z tego adresu.</p>
         <input id="set_url">
         <button class="btn primary" style="margin-top:10px" id="set_save">Zapisz</button>
+      </div>
+      <div class="card">
+        <h2>Link do remanentu (magazyn — bez logowania)</h2>
+        <p class="muted" style="margin-top:0">Osoba z tym linkiem widzi tylko listę pozycji i wpisuje stany (z podpisem imieniem) oraz może zapisać remanent do historii. Nie widzi eventów, stawek ani kwot. Jeśli link wyciekł — wygeneruj nowy, stary przestanie działać.</p>
+        <div style="display:flex;gap:8px;align-items:center"><input id="set_stock" readonly style="flex:1"><button class="btn sm" id="set_stockCopy">Kopiuj</button><button class="btn sm danger" id="set_stockNew">Nowy link</button></div>
       </div>
     </div>
   </div>
@@ -435,10 +467,97 @@ document.querySelectorAll('#evPane .tabs button').forEach(b=>b.onclick=()=>{
 
 /* ---------- EVENTS ---------- */
 const STATUS = {wstepny:['Wstępny','warn'],potwierdzony:['Potwierdzony','ok'],zakonczony:['Zakończony',''],anulowany:['Anulowany','bad']};
+/* ---------- GOTOWOŚĆ (checklista) ---------- */
+let ACC={};
+const tbdv=v=>!v||/ustal/i.test(v);
+const endOf=e=>(e.event_end_date&&e.event_end_date>=e.event_date)?e.event_end_date:e.event_date;
+const inRange=(e,ds)=>ds>=e.event_date&&ds<=endOf(e);
+const CARS=['COMBO','CADDY'];
+const carsOf=e=>CARS.filter(c=>new RegExp(c,'i').test(e.vehicle||''));
+function carConflicts(e){
+  const mine=carsOf(e); if(!mine.length) return [];
+  const out=[]; events.forEach(o=>{ if(o.id===e.id||o.status==='anulowany') return; if(o.event_date>endOf(e)||endOf(o)<e.event_date) return;
+    carsOf(o).filter(c=>mine.includes(c)).forEach(car=>out.push({car,other:o})); });
+  return out;
+}
+const hasBranding=e=>!!(e.branding&&e.branding.trim()&&!/^(-|—|nie dotyczy|brak)/i.test(e.branding.trim()));
+const CHK_AUTO=[
+ {k:'sklad',label:'Skład skompletowany',fn:e=>{const a=ACC[e.id]||{b:0,p:0}; const need=(e.bartenders_needed||0)+(e.helpers_needed||0); return need>0&&a.b>=(e.bartenders_needed||0)&&a.p>=(e.helpers_needed||0);}},
+ {k:'zbiorka',label:'Godzina zbiórki',fn:e=>!tbdv(e.meeting_time)},
+ {k:'wyjazd',label:'Godzina wyjazdu',fn:e=>!tbdv(e.departure_time)},
+ {k:'agenda',label:'Agenda opublikowana',fn:e=>!!e.agenda_published},
+ {k:'auto_ok',label:'Auto przypisane, bez kolizji',fn:e=>carsOf(e).length>0&&carConflicts(e).length===0},
+];
+const CHK_MAN=[
+ {k:'zakupy',label:'Zakupy zrobione'},
+ {k:'auto',label:'Samochód zarezerwowany'},
+ {k:'klisza_projekt',label:'Klisza — projekt',br:true},
+ {k:'klisza_druk',label:'Klisza — wydrukowana',br:true},
+ {k:'klisza_magazyn',label:'Klisza — na magazynie',br:true},
+ {k:'klisza_bary',label:'Klisza — wymieniona w barach',br:true},
+ {k:'spakowane',label:'Spakowane'},
+];
+function readiness(e){
+  const c=e.checklist||{}; let done=0,total=0; const br=hasBranding(e);
+  CHK_AUTO.forEach(x=>{ total++; if(x.fn(e)) done++; });
+  CHK_MAN.forEach(x=>{ if(x.br&&!br) return; total++; if(c[x.k]) done++; });
+  return {done,total,pct:total?Math.round(done/total*100):0};
+}
+function pctPill(e){ const r=readiness(e); return `<span class="pill ${r.pct>=100?'ok':r.pct>=50?'warn':'bad'}" title="${r.done}/${r.total} gotowe">${r.pct}%</span>`; }
+function renderChk(){
+  if(!cur) return; const r=readiness(cur); const c=cur.checklist||{}; const br=hasBranding(cur);
+  $('chkPct').textContent=`${r.pct}% · ${r.done}/${r.total}`; $('chkBar').style.width=r.pct+'%'; $('chkBar').style.background=r.pct>=100?'var(--ok)':r.pct>=50?'var(--acc)':'var(--bad)';
+  $('chkChips').innerHTML = CHK_AUTO.map(x=>`<span class="chip auto ${x.fn(cur)?'done':''}" title="liczone automatycznie">${x.fn(cur)?'✓':'○'} ${x.label}</span>`).join('')
+    + CHK_MAN.map(x=>x.br&&!br?`<span class="chip na" title="brak kliszy w tym evencie">${x.label}</span>`:`<button class="chip ${c[x.k]?'done':''}" data-chk="${x.k}">${c[x.k]?'✓':'○'} ${x.label}</button>`).join('');
+  $('chkChips').querySelectorAll('[data-chk]').forEach(b=>b.onclick=async()=>{ const k=b.dataset.chk; const nc={...(cur.checklist||{})}; nc[k]=!nc[k]; cur.checklist=nc; await api('PATCH',`events?id=eq.${cur.id}`,{checklist:nc},'return=minimal'); renderChk(); renderEvList(); renderCal(); });
+}
+const dtIcs=(d,t)=>{ const q=(t||'12:00').split(':'); return d.replace(/-/g,'')+'T'+String(q[0]).padStart(2,'0')+String(q[1]||'00').padStart(2,'0')+'00'; };
+const endDateOf=e=>{ const base=endOf(e); if(e.end_time&&e.start_time&&e.end_time<=e.start_time){ const x=new Date(base+'T12:00:00'); x.setDate(x.getDate()+1); return x.toISOString().slice(0,10); } return base; };
+function gcalUrl(e){
+  const u=new URLSearchParams({action:'TEMPLATE',text:'PMB · '+e.name,dates:dtIcs(e.event_date,e.start_time)+'/'+dtIcs(endDateOf(e),e.end_time||e.start_time),ctz:'Europe/Warsaw',location:[e.venue,e.address].filter(Boolean).join(', '),details:`Zbiórka: ${e.meeting_time||'do ustalenia'} · ${e.meeting_place||''}\nPanel: ${location.origin}${location.pathname}`});
+  return 'https://calendar.google.com/calendar/render?'+u.toString();
+}
+function icsAll(){
+  const t=new Date(); t.setDate(t.getDate()-30); const from=t.toISOString().slice(0,10);
+  const list=events.filter(e=>['wstepny','potwierdzony'].includes(e.status)&&e.event_date>=from);
+  const cl=s=>String(s||'').replace(/[\n;,]/g,' ');
+  const vev=e=>['BEGIN:VEVENT','UID:pmb-ev-'+e.id+'@pimpmybar.pl','DTSTART;TZID=Europe/Warsaw:'+dtIcs(e.event_date,e.start_time),'DTEND;TZID=Europe/Warsaw:'+dtIcs(endDateOf(e),e.end_time||e.start_time),'SUMMARY:PMB · '+cl(e.name),'LOCATION:'+cl([e.venue,e.address].filter(Boolean).join(' ')),'DESCRIPTION:Zbiórka '+cl(e.meeting_time||'do ustalenia')+' · '+cl(e.meeting_place)+' · panel: '+location.origin+location.pathname,'END:VEVENT'].join('\r\n');
+  const ics='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//PMB Crew//PL\r\nCALSCALE:GREGORIAN\r\nX-WR-CALNAME:PMB Eventy\r\n'+list.map(vev).join('\r\n')+'\r\nEND:VCALENDAR';
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar;charset=utf-8'})); a.download='pmb-eventy.ics'; a.click(); toast(list.length+' eventów w pliku .ics');
+}
+$('icsAll').onclick=icsAll;
+$('g_vehicle').oninput=()=>{ if(!cur) return; const conf=carConflicts({...cur, vehicle:$('g_vehicle').value}); const w=$('g_vehicleWarn'); w.textContent=conf.length?'⚠ '+conf.map(c=>`${c.car} zajęty: ${c.other.name.split(' — ')[0]} (${c.other.event_date})`).join(' · '):''; w.style.color=conf.length?'var(--bad)':''; };
+
+/* ---------- KALENDARZ ---------- */
+let calY=new Date().getFullYear(), calM=new Date().getMonth();
+const MONTHS=['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
+function renderCal(){
+  if($('evCal').classList.contains('hidden')) return;
+  $('calTitle').textContent=MONTHS[calM]+' '+calY;
+  const first=new Date(calY,calM,1); const startDow=(first.getDay()+6)%7; const days=new Date(calY,calM+1,0).getDate();
+  const todayS=new Date().toISOString().slice(0,10);
+  let html=['Pn','Wt','Śr','Cz','Pt','So','Nd'].map(d=>`<div class="dh">${d}</div>`).join('');
+  const cells=[]; for(let i=0;i<startDow;i++) cells.push(null); for(let d=1;d<=days;d++) cells.push(d); while(cells.length%7) cells.push(null);
+  cells.forEach(d=>{ if(!d){ html+='<div class="d out"></div>'; return; }
+    const ds=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const evs=events.filter(e=>inRange(e,ds));
+    html+=`<div class="d ${ds===todayS?'today':''}"><div class="n">${d}</div>${evs.map(e=>`<span class="ev ${STATUS[e.status]?.[1]||''} ${cur&&cur.id===e.id?'on':''}" data-cal="${e.id}" title="${esc(e.name)} · ${e.start_time||''}${carsOf(e).length?' · '+carsOf(e).join('+'):''}">${esc(e.name.split(' — ')[0])}${carsOf(e).length?`<i class="car ${carConflicts(e).some(c=>inRange(c.other,ds))?'clash':''}">${carsOf(e).map(c=>c[0]).join('+')}</i>`:''}</span>`).join('')}</div>`; });
+  $('calGrid').innerHTML=html;
+  $('calGrid').querySelectorAll('[data-cal]').forEach(el=>el.onclick=()=>openEvent(el.dataset.cal));
+}
+$('calPrev').onclick=()=>{ calM--; if(calM<0){calM=11;calY--;} renderCal(); };
+$('calNext').onclick=()=>{ calM++; if(calM>11){calM=0;calY++;} renderCal(); };
+$('viewList').onclick=()=>{ $('evList').classList.remove('hidden'); $('evCal').classList.add('hidden'); document.querySelector('.cols').classList.remove('wide'); $('viewList').style.fontWeight='700'; $('viewCal').style.fontWeight=''; };
+$('viewCal').onclick=()=>{ $('evList').classList.add('hidden'); $('evCal').classList.remove('hidden'); document.querySelector('.cols').classList.add('wide'); $('viewCal').style.fontWeight='700'; $('viewList').style.fontWeight=''; if(cur){ calY=+cur.event_date.slice(0,4); calM=+cur.event_date.slice(5,7)-1; } renderCal(); };
+
+function renderEvList(){
+  $('evList').innerHTML = events.map(e=>`<div class="evitem ${cur&&cur.id===e.id?'on':''}" data-id="${e.id}"><b>${esc(e.name)}</b><small>${e.event_date}${endOf(e)!==e.event_date?' → '+endOf(e).slice(5):''} · <span class="pill ${STATUS[e.status]?.[1]||''}">${STATUS[e.status]?.[0]||e.status}</span> ${pctPill(e)}${carsOf(e).length?' · '+carsOf(e).join('+'):''}${carConflicts(e).length?' <span class="pill bad">kolizja auta</span>':''}</small></div>`).join('') || '<div class="muted">Brak eventów</div>';
+  document.querySelectorAll('.evitem').forEach(el=>el.onclick=()=>openEvent(el.dataset.id));
+}
 async function loadEvents(){
   events = await api('GET','events?select=*&order=event_date.desc');
-  $('evList').innerHTML = events.map(e=>`<div class="evitem ${cur&&cur.id===e.id?'on':''}" data-id="${e.id}"><b>${esc(e.name)}</b><small>${e.event_date} · <span class="pill ${STATUS[e.status]?.[1]||''}">${STATUS[e.status]?.[0]||e.status}</span></small></div>`).join('') || '<div class="muted">Brak eventów</div>';
-  document.querySelectorAll('.evitem').forEach(el=>el.onclick=()=>openEvent(el.dataset.id));
+  try{ const acc=await api('GET','assignments?select=event_id,role&status=eq.zaakceptowany'); ACC={}; acc.forEach(a=>{ const o=ACC[a.event_id]=ACC[a.event_id]||{b:0,p:0}; if(a.role==='pomocnik') o.p++; else o.b++; }); }catch(e){}
+  renderEvList(); renderCal();
 }
 async function openEvent(id){
   cur = events.find(e=>e.id===id); if(!cur) return;
@@ -446,7 +565,7 @@ async function openEvent(id){
   $('evPane').classList.remove('hidden');
   $('e_title').textContent=cur.name; $('e_sub').textContent=`${cur.event_date} · ${cur.start_time||''}–${cur.end_time||''} · ${cur.venue||''}`;
   // edit
-  $('e_name').value=cur.name||''; $('e_client').value=cur.client||''; $('e_date').value=cur.event_date||''; $('e_start').value=cur.start_time||''; $('e_end').value=cur.end_time||'';
+  $('e_name').value=cur.name||''; $('e_client').value=cur.client||''; $('e_date').value=cur.event_date||''; $('e_end_date').value=cur.event_end_date||''; $('e_start').value=cur.start_time||''; $('e_end').value=cur.end_time||'';
   $('e_status').value=cur.status; $('e_venue').value=cur.venue||''; $('e_address').value=cur.address||''; $('e_map').value=cur.map_url||'';
   $('e_vurl').value=cur.venue_url||''; $('e_pay').value=cur.payment_info||''; $('e_travel').value=cur.travel_note||'';
   $('e_drb').value=cur.default_rate_bartender??''; $('e_drh').value=cur.default_rate_helper??''; $('e_drn').value=cur.default_rate_note||''; $('e_open').checked=cur.invite_open!==false;
@@ -461,7 +580,7 @@ async function openEvent(id){
   $('h_type').value=cur.service_type||''; $('h_paytype').value=cur.payment_type||''; $('h_modules').value=cur.modules||''; $('h_contract').value=cur.contract_url||'';
   $('h_orgphone').value=cur.organizer_phone||''; $('h_km').value=cur.distance_km??''; $('h_tolls').value=cur.tolls||''; $('h_travel').value=cur.travel_time||''; $('h_depart').value=cur.departure_time||''; $('h_welcome').value=cur.welcome_drinks||'';
   $('e_contractBtn').classList.toggle('hidden', !cur.contract_url); $('e_contractBtn').href=cur.contract_url||'#';
-  const PAGE_BASE=location.protocol==='file:'?'https://pimpmybar.github.io/pmb-crew/':''; $('e_agendaBtn').href=PAGE_BASE+'agenda.html?id='+cur.id; $('e_menuBtn').href=PAGE_BASE+'menu.html?id='+cur.id;
+  const PAGE_BASE=location.protocol==='file:'?'https://pimpmybar.github.io/pmb-crew/':''; $('e_agendaBtn').href=PAGE_BASE+'agenda.html?id='+cur.id; $('e_menuBtn').href=PAGE_BASE+'menu.html?id='+cur.id; $('e_gcalBtn').href=gcalUrl(cur); renderChk(); renderCal();
   $('g_transport').value=cur.transport||''; $('g_schedule').value=cur.schedule||''; $('g_vehicle').value=cur.vehicle||''; $('g_branding').value=cur.branding||''; $('g_menu').value=cur.menu||''; $('g_notes').value=cur.notes||''; $('g_pub').checked=!!cur.agenda_published;
   $('a_result').classList.add('hidden');
   await Promise.all([loadAsgs(), loadUpdates()]);
@@ -475,13 +594,14 @@ $('newEvent').onclick = async()=>{
 };
 $('e_save').onclick = async()=>{
   const n = v => v===''?null:Number(v);
-  const body={name:$('e_name').value,client:$('e_client').value,event_date:$('e_date').value,start_time:$('e_start').value,end_time:$('e_end').value,status:$('e_status').value,
+  const body={name:$('e_name').value,client:$('e_client').value,event_date:$('e_date').value,event_end_date:$('e_end_date').value||null,start_time:$('e_start').value,end_time:$('e_end').value,status:$('e_status').value,
     venue:$('e_venue').value,address:$('e_address').value,map_url:$('e_map').value,venue_url:$('e_vurl').value,payment_info:$('e_pay').value,travel_note:$('e_travel').value,default_rate_bartender:n($('e_drb').value),default_rate_helper:n($('e_drh').value),default_rate_note:$('e_drn').value,invite_open:$('e_open').checked,guests:n($('e_guests').value),bartenders_needed:n($('e_bart').value),helpers_needed:n($('e_help').value),summary:$('e_summary').value};
   await api('PATCH',`events?id=eq.${cur.id}`,body); toast('Zapisano'); await loadEvents(); openEvent(cur.id);
 };
 $('e_del').onclick = async()=>{ if(!confirm('Usunąć event razem z przypisaniami?')) return; await api('DELETE',`events?id=eq.${cur.id}`,null,'return=minimal'); cur=null; $('evPane').classList.add('hidden'); loadEvents(); };
 
 $('g_save').onclick = async()=>{
+  { const conf=carConflicts({...cur, vehicle:$('g_vehicle').value}); if(conf.length && !confirm('UWAGA — kolizja aut:\n'+conf.map(c=>`${c.car}: zajęty przez „${c.other.name}” (${c.other.event_date}${c.other.event_end_date?'–'+c.other.event_end_date:''})`).join('\n')+'\n\nZapisać mimo to?')) return; }
   const body={meeting_place:$('g_place').value,meeting_time:$('g_time').value,dress_code:$('g_dress').value,packing_list:$('g_pack').value,cash_needed:$('g_cash').checked,cash_note:$('g_cashnote').value,
     contact_name:$('g_cname').value,contact_phone:$('g_cphone').value,transport:$('g_transport').value,schedule:$('g_schedule').value,vehicle:$('g_vehicle').value,branding:$('g_branding').value,menu:$('g_menu').value,notes:$('g_notes').value,agenda_published:$('g_pub').checked,
     agenda_version:(cur.agenda_version||0)+1};
@@ -516,6 +636,7 @@ function waMsg(a){
 async function loadAsgs(){
   asgs = await api('GET',`assignments?select=*,crew(*)&event_id=eq.${cur.id}&order=created_at`);
   const acc=asgs.filter(a=>a.status==='zaakceptowany');
+  ACC[cur.id]={b:acc.filter(a=>a.role!=='pomocnik').length,p:acc.filter(a=>a.role==='pomocnik').length}; renderChk(); renderEvList();
   $('stat').innerHTML = `<div><b>${acc.filter(a=>a.role==='barman').length}/${cur.bartenders_needed||0}</b>barmanów</div><div><b>${acc.filter(a=>a.role==='pomocnik').length}/${cur.helpers_needed||0}</b>pomocników</div><div><b>${asgs.filter(a=>a.status==='wyslany').length}</b>nie otworzyło</div><div><b>${asgs.filter(a=>a.status==='otwarty').length}</b>bez odpowiedzi</div><div><b>${asgs.filter(a=>a.status==='odrzucony').length}</b>odrzuciło</div>`;
   $('asgBody').innerHTML = asgs.map(a=>{const c=a.crew||{}; const s=ASG[a.status]||[a.status,''];
     return `<tr><td><b>${esc([c.first_name,c.last_name].filter(Boolean).join(' ')||'(bez imienia)')}</b><br><span class="muted mono">${esc(c.phone)}</span></td>
@@ -650,9 +771,10 @@ let SHOP={events:[],items:[],rows:[]};
 function isoMonday(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); return x.toISOString().slice(0,10); }
 async function loadShop(){
   if(!CAT.length) await loadCatalog();
-  if(!$('s_from').value){ const m=isoMonday(new Date()); $('s_from').value=m; const t=new Date(m); t.setDate(t.getDate()+13); $('s_to').value=t.toISOString().slice(0,10); }
+  if(!$('s_from').value) setWeek(0);
   await runShop(); loadSnaps();
 }
+function setWeek(offset){ const m=new Date(isoMonday(new Date())); m.setDate(m.getDate()+7*offset); const t=new Date(m); t.setDate(t.getDate()+6); $('s_from').value=m.toISOString().slice(0,10); $('s_to').value=t.toISOString().slice(0,10); }
 async function runShop(){
   const f=$('s_from').value, t=$('s_to').value; if(!f||!t) return;
   SHOP.events = await api('GET',`events?select=id,name,event_date,status&event_date=gte.${f}&event_date=lte.${t}&status=in.(wstepny,potwierdzony)&order=event_date`);
@@ -671,7 +793,8 @@ function renderShop(){
   html+='</tbody></table>'; $('s_table').innerHTML = SHOP.rows.length? html : '<p class="muted">Nic do zamówienia.</p>';
   $('s_table').querySelectorAll('[data-stock]').forEach(i=>i.onchange=async()=>{ const c=CAT.find(x=>x.id===i.dataset.stock); c.stock=i.value===''?null:Number(i.value); await api('PATCH',`catalog?id=eq.${c.id}`,{stock:c.stock,stock_updated_at:new Date().toISOString()},'return=minimal'); renderShop(); toast('Stan zapisany'); });
 }
-$('s_run').onclick=runShop; $('s_onlyOrder').onchange=renderShop;
+$('s_run').onclick=runShop; $('s_onlyOrder').onchange=renderShop; $('s_from').onchange=runShop; $('s_to').onchange=runShop;
+$('s_thisWeek').onclick=()=>{ setWeek(0); runShop(); }; $('s_nextWeek').onclick=()=>{ setWeek(1); runShop(); };
 $('s_copy').onclick=()=>{ const lines=[]; let cat=null; SHOP.rows.filter(r=>r.order>0).forEach(r=>{ if(r.c.category!==cat){cat=r.c.category; lines.push('\n'+cat);} lines.push(`${r.c.name} — ${fmtN(r.order)} ${r.c.unit||''}`); }); navigator.clipboard.writeText(`ZAMÓWIENIE PMB ${$('s_from').value} – ${$('s_to').value}${lines.join('\n')}`); toast('Skopiowano'); };
 $('s_csv').onclick=()=>{ const evs=SHOP.events; const head=['Kategoria','Pozycja','Jedn.',...evs.map(e=>e.name),'Razem','Stan','Do zamówienia']; const rows=SHOP.rows.map(r=>[r.c.category,r.c.name,r.c.unit||'',...r.per,r.need,r.stock,r.order]); navigator.clipboard.writeText([head,...rows].map(r=>r.map(x=>`"${String(x??'').replace(/"/g,'""')}"`).join(';')).join('\n')); toast('CSV skopiowany'); };
 
@@ -772,6 +895,10 @@ async function loadSettings(){
   const rows = await api('GET','settings?select=*'); const S={}; rows.forEach(r=>S[r.key]=r.value);
   $('set_terms').value=S.terms||''; $('set_wh').value=S.warehouse||''; $('set_recruitOpen').checked=(S.recruit_open||'true')==='true';
   const link=`${crewUrl()}?r=1`; $('set_recruit').textContent=link;
+  const stockLink=S.stock_key?`${crewUrl().replace(/crew\.html$/,'remanent.html')}?k=${S.stock_key}`:'uruchom update19.sql w Supabase';
+  $('set_stock').value=stockLink;
+  $('set_stockCopy').onclick=()=>{ if(S.stock_key){ navigator.clipboard.writeText(stockLink); toast('Link skopiowany'); } };
+  $('set_stockNew').onclick=async()=>{ if(!confirm('Wygenerować nowy link do remanentu? Stary przestanie działać.')) return; const k=[...crypto.getRandomValues(new Uint8Array(8))].map(b=>b.toString(16).padStart(2,'0')).join(''); await saveSetting('stock_key',k); toast('Nowy link gotowy'); loadSettings(); };
   $('set_recruitCopy').onclick=()=>{ navigator.clipboard.writeText(link); toast('Link skopiowany'); };
 }
 async function saveSetting(key,value){ await api('POST','settings',{key,value,updated_at:new Date().toISOString()},'resolution=merge-duplicates,return=minimal'); }
