@@ -345,7 +345,10 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const money = n => n==null?'—':Number(n).toLocaleString('pl-PL')+' zł';
 let session = null, events=[], people=[], cur=null, asgs=[], curPerson=null;
-const crewUrl = () => localStorage.getItem('pmb_crew_url') || location.href.replace(/panel\.html.*$/,'crew.html');
+const CREW_URL_DEFAULT = 'https://pimpmybar.github.io/pmb-crew/crew.html';
+const crewUrl = () => { const saved = localStorage.getItem('pmb_crew_url'); if (saved && /^https?:\/\//.test(saved)) return saved;
+  if (location.protocol === 'file:') return CREW_URL_DEFAULT;
+  return location.href.replace(/[^\/]*panel[^\/]*\.html.*$/, 'crew.html'); };
 
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'),2200); }
 
