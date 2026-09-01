@@ -377,6 +377,19 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
         <p class="muted" style="margin:10px 0 0">Suma ilości z agend eventów w zakresie (statusy wstępny + potwierdzony), minus stan magazynu = do zamówienia. Stan edytujesz bezpośrednio w tabeli (remanent).</p>
         <div id="s_events" class="muted" style="margin-top:6px"></div>
         <div id="s_buyChips" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;padding:8px 10px;border:1px dashed var(--line);border-radius:10px">
+          <span class="muted" style="font-size:12px">Dokupić dodatkowo (poza agendami):</span>
+          <input id="x_name" list="xList" placeholder="produkt z katalogu…" style="width:230px;padding:6px 8px"><datalist id="xList"></datalist>
+          <input id="x_qty" type="number" step="any" placeholder="ilość" style="width:80px;padding:6px 8px">
+          <button class="btn sm" id="x_add">+ Dodaj do listy</button>
+          <span class="muted" style="font-size:12px;margin-left:12px">Nowy produkt:</span>
+          <input id="x_new" placeholder="nazwa, np. Cukier 1 kg" style="width:180px;padding:6px 8px">
+          <input id="x_newcat" list="catList" placeholder="kategoria" style="width:130px;padding:6px 8px">
+          <input id="x_newunit" placeholder="jedn." style="width:60px;padding:6px 8px">
+          <input id="x_newqty" type="number" step="any" placeholder="ilość" style="width:80px;padding:6px 8px">
+          <button class="btn sm" id="x_addnew">+ Utwórz i dodaj</button>
+        </div>
+        <div id="s_share" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:12px"></div>
         <div style="overflow-x:auto;margin-top:10px"><div id="s_table"></div></div>
       </div>
       <div class="card">
@@ -815,8 +828,49 @@ function renderBuyChips(){
 async function loadShop(){
   if(!CAT.length) await loadCatalog();
   if(!$('s_from').value) setWeek(0);
-  await loadBuy(); renderBuyChips();
-  await runShop(); loadSnaps(); renderMag();
+  await loadBuy(); renderBuyChips(); fillXList();
+  await runShop(); loadSnaps(); renderMag(); loadShare();
+}
+function fillXList(){ $('xList').innerHTML=CAT.map(c=>`<option value="${esc(c.name)}">${esc(c.category)}</option>`).join(''); }
+const isExtraId=id=>!!(SHOP.notes&&SHOP.notes[id]&&SHOP.notes[id].extra);
+async function addExtra(c, qty){
+  if(!c){ toast('Wybierz produkt z listy'); return; }
+  if(!(qty>0)){ toast('Podaj ilość'); return; }
+  SHOP.notes=SHOP.notes||{}; SHOP.notes[c.id]=Object.assign({},SHOP.notes[c.id]||{},{q:qty,extra:true});
+  await saveShopNotes(); renderShop(); toast(`Dodano: ${c.name} — ${fmtN(qty)} ${c.unit||''}`);
+}
+$('x_add').onclick=async()=>{ const nm=$('x_name').value.trim().toLowerCase(); const c=CAT.find(x=>x.name.toLowerCase()===nm)||CAT.find(x=>x.name.toLowerCase().includes(nm)&&nm.length>=3); await addExtra(c, Number($('x_qty').value)); if(c){ $('x_name').value=''; $('x_qty').value=''; } };
+$('x_addnew').onclick=async()=>{
+  const name=$('x_new').value.trim(), cat=($('x_newcat').value.trim()||'DODATKI').toUpperCase(), unit=$('x_newunit').value.trim()||'szt.', qty=Number($('x_newqty').value);
+  if(!name){ toast('Podaj nazwę'); return; } if(!(qty>0)){ toast('Podaj ilość'); return; }
+  let c=CAT.find(x=>x.name.toLowerCase()===name.toLowerCase());
+  if(!c){ const [row]=await api('POST','catalog',{category:cat,name,unit,sort:999},'return=representation'); await loadCatalog(); fillXList(); renderBuyChips(); c=CAT.find(x=>x.id===row.id); }
+  await addExtra(c, qty); $('x_new').value=''; $('x_newqty').value='';
+};
+/* link do listy zakupów dla osób z dostępem magazynowym + postęp koszyka */
+let WH_CREW=null;
+async function loadShare(){
+  try{ WH_CREW = await api('GET','crew?warehouse_access=eq.true&active=eq.true&select=id,first_name,last_name,my_token&order=first_name'); }catch(e){ WH_CREW=[]; }
+  renderShare();
+}
+function shopUrl(tok){ return crewUrl().replace(/crew\.html.*$/,'zakupy.html')+'?w='+encodeURIComponent(tok); }
+function renderShare(){
+  const el=$('s_share'); if(!el) return;
+  const items=shopExportRows().filter(x=>x.order>0); const done=items.filter(x=>SHOP.checks&&SHOP.checks[x.r.c.id]).length;
+  const prog = items.length? `<span class="pill ${done>=items.length?'ok':done?'warn':''}" title="Odhaczone z telefonu przez magazyn">🛒 w koszyku ${done}/${items.length}</span>` : '';
+  const who = (WH_CREW||[]).filter(p=>p.my_token).map(p=>`<button class="btn sm" data-shlink="${esc(p.my_token)}" title="${esc(shopUrl(p.my_token))}">🔗 Lista dla: ${esc(p.first_name)}</button>`).join('');
+  el.innerHTML = prog + (who? `<span class="muted">Lista zakupów jest publikowana automatycznie — wyślij link:</span> ${who}` : (WH_CREW? '<span class="muted">Nadaj komuś „dostęp magazynowy” w Ludziach, żeby móc wysłać mu listę zakupów.</span>':''));
+  el.querySelectorAll('[data-shlink]').forEach(b=>b.onclick=()=>{ navigator.clipboard.writeText(shopUrl(b.dataset.shlink)); toast('Link skopiowany — wyślij go na WhatsApp/SMS'); });
+}
+let pubT=null, lastPub='';
+function publishShopList(){
+  if(!SHOP.notesKey) return; clearTimeout(pubT);
+  pubT=setTimeout(async()=>{
+    const items=shopExportRows().filter(x=>x.order>0).map(({r,order,comment})=>({key:r.c.id,category:r.c.category,name:r.c.name,unit:r.c.unit||'',qty:order,comment:comment||'',extra:isExtraId(r.c.id)}));
+    const sig=SHOP.notesKey+'|'+JSON.stringify(items); if(sig===lastPub) return;
+    try{ await api('POST','shop_lists?on_conflict=week_key',{week_key:SHOP.notesKey.replace(/^shop_/,''),week_from:$('s_from').value,week_to:$('s_to').value,items,updated_at:new Date().toISOString()},'resolution=merge-duplicates,return=minimal'); lastPub=sig; }
+    catch(e){ /* brak update26 — lista po prostu nie jest publikowana */ }
+  },1200);
 }
 function setWeek(offset){ const m=new Date(isoMonday(new Date())); m.setDate(m.getDate()+7*offset); const t=new Date(m); t.setDate(t.getDate()+6); $('s_from').value=m.toISOString().slice(0,10); $('s_to').value=t.toISOString().slice(0,10); }
 async function runShop(){
@@ -825,8 +879,9 @@ async function runShop(){
   const ids=SHOP.events.map(e=>e.id);
   SHOP.items = ids.length ? await api('GET',`packing_items?select=event_id,catalog_id,name,unit,qty_num,note&event_id=in.(${ids.join(',')})&qty_num=not.is.null`) : [];
   $('s_events').textContent = SHOP.events.length ? 'Eventy: '+SHOP.events.map(e=>`${e.name} (${e.event_date})`).join(' · ') : 'Brak eventów w tym zakresie.';
-  SHOP.notesKey=`shop_${f}_${t}`; SHOP.notes={};
+  SHOP.notesKey=`shop_${f}_${t}`; SHOP.notes={}; SHOP.checks={};
   try{ const [row]=await api('GET',`settings?key=eq.${SHOP.notesKey}&select=value`); if(row&&row.value) SHOP.notes=JSON.parse(row.value)||{}; }catch(e){ SHOP.notes={}; }
+  try{ const cs=await api('GET',`shop_checks?week_key=eq.${f}_${t}&select=item_key,checked_at,checked_by`); (cs||[]).forEach(x=>SHOP.checks[x.item_key]=x); }catch(e){}
   renderShop();
 }
 async function saveShopNotes(){
@@ -835,7 +890,7 @@ async function saveShopNotes(){
 }
 function shopExportRows(){ // wiersze do CSV / zamówienia (z ręcznym nadpisaniem i komentarzem)
   const N=SHOP.notes||{};
-  return SHOP.rows.filter(r=>isBuy(r.c)).map(r=>{ const n=N[r.c.id]||{}; const ov=n.q!=null&&n.q!==''; return {r, order: ov?Number(n.q):r.order, comment:n.c||'', overridden:ov}; });
+  return SHOP.rows.filter(r=>isBuy(r.c)||isExtraId(r.c.id)).map(r=>{ const n=N[r.c.id]||{}; const ov=n.q!=null&&n.q!==''; return {r, order: ov?Number(n.q):r.order, comment:n.c||'', overridden:ov}; });
 }
 function downloadFile(name, text, mime){
   const blob=new Blob([text],{type:mime||'text/plain;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
@@ -859,8 +914,8 @@ function renderShop(){
   SHOP.items.forEach(i=>{ i._cid = i.catalog_id || byName[mNorm(i.name||'')]?.id || null; });
   const all = CAT.map(c=>{ const per=evs.map(e=>SHOP.items.filter(i=>i.event_id===e.id&&i._cid===c.id).reduce((a,i)=>a+Number(i.qty_num||0),0)); const need=per.reduce((a,b)=>a+b,0); const stock=c.stock==null?0:Number(c.stock); return {c,per,need,stock,order:Math.max(need-stock,0)}; });
   all.sort((a,b)=>catIdx(a.c.category)-catIdx(b.c.category)||a.c.category.localeCompare(b.c.category,'pl')||(a.c.sort||0)-(b.c.sort||0)||a.c.name.localeCompare(b.c.name,'pl'));
-  const covered = all.filter(r=>r.need>0 && r.order===0 && isBuy(r.c));
-  SHOP.rows = all.filter(r=>r.need>0 || (!only && r.stock>0)).filter(r=>!only || (r.order>0 && isBuy(r.c)));
+  const covered = all.filter(r=>r.need>0 && r.order===0 && isBuy(r.c) && !isExtraId(r.c.id));
+  SHOP.rows = all.filter(r=>r.need>0 || (!only && r.stock>0) || isExtraId(r.c.id)).filter(r=>!only || isExtraId(r.c.id) || (r.order>0 && isBuy(r.c)));
   // grupy zamienników: potrzeba i stan liczone dla całej grupy (np. WÓDKA); grupa jawna albo zgadnięta z nazwy
   const gNeed={}, gShown=new Set();
   all.forEach(r=>{ const g=effGroup(r.c); if(g&&r.need>0) gNeed[g]=(gNeed[g]||0)+r.need; });
@@ -878,10 +933,12 @@ function renderShop(){
   const N=SHOP.notes||{};
   let cat=null, html=`<table class="xl"><thead><tr><th>Pozycja</th><th>Jedn.</th>${evs.map(e=>`<th class="ev" title="${esc(e.name)}">${esc(e.name.slice(0,14))}<br><span class="muted">${e.event_date.slice(5)}</span></th>`).join('')}<th class="sum">Razem</th><th class="right" style="width:100px" title="Stan magazynu z ostatniego remanentu (całościowy) — możesz poprawić tutaj">Stan<br><span class="muted" style="font-weight:400;text-transform:none">remanent</span></th><th class="right" style="width:110px" title="Wyliczone: Razem − Stan. Możesz nadpisać własną liczbą.">Do zamówienia</th><th style="min-width:160px">Komentarz</th></tr></thead><tbody>`;
   SHOP.rows.forEach(r=>{ if(r.c.category!==cat){ cat=r.c.category; html+=`<tr class="cat"><td colspan="${NCOL}" style="color:var(--acc);font-weight:700;padding-top:12px">${esc(cat)}</td></tr>`; }
-    const n=N[r.c.id]||{}; const ov=n.q!=null&&n.q!==''; const oq=ov?Number(n.q):r.order; const buy=isBuy(r.c);
+    const n=N[r.c.id]||{}; const ov=n.q!=null&&n.q!==''; const oq=ov?Number(n.q):r.order; const xtra=isExtraId(r.c.id); const buy=xtra||isBuy(r.c);
+    const chk=SHOP.checks&&SHOP.checks[r.c.id]; const chkTag=chk?` <span class="pill ok" style="font-size:10px" title="Odhaczone z telefonu">🛒 ${esc(chk.checked_by||'')} ${new Date(chk.checked_at).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})}</span>`:'';
+    const xTag=xtra?` <span class="pill warn" style="font-size:10px">dokupienie</span> <button class="btn sm" data-xdel="${r.c.id}" title="Usuń z listy dokupień" style="padding:1px 6px;font-size:11px">✕</button>`:'';
     const tog=`<button class="btn sm" data-buyitem="${r.c.id}" title="${buy?'Wyłącz tę pozycję z zakupów (zostaje w pakowaniu)':'Włącz tę pozycję do zakupów'}" style="padding:1px 6px;font-size:11px;margin-left:6px;opacity:.7">${buy?'🛒':'✕'}</button>`;
     if(!buy){ html+=`<tr style="opacity:.55"><td>${esc(r.c.name)}${tog}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="ev">${v?fmtN(v):'<span class="muted">·</span>'}</td>`).join('')}<td class="sum"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right"></td><td class="right muted" style="font-size:12px">nie kupujemy</td><td></td></tr>`; return; }
-    html+=`<tr><td>${esc(r.c.name)}${effGroup(r.c)?` <span class="muted" style="font-size:11px">⇄ ${esc(effGroup(r.c))}</span>`:''}${tog}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="ev">${v?fmtN(v):'<span class="muted">·</span>'}</td>`).join('')}<td class="sum"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right"></td><td class="right"><input type="number" step="any" data-oq="${r.c.id}" value="${ov?n.q:(r.order>0?r.order:'')}" placeholder="${r.order>0?'':'—'}" title="${ov?'Nadpisane ręcznie (wyliczone: '+fmtN(r.order)+')':'Wyliczone automatycznie'}" style="padding:4px 6px;width:80px;text-align:right;font-weight:700;color:${oq>0?'var(--acc)':'var(--muted)'};${ov?'border-color:var(--acc)':''}">${ov?`<div class="muted" style="font-size:10px">wyl. ${fmtN(r.order)}</div>`:''}</td><td><input data-oc="${r.c.id}" value="${esc(n.c||'')}" placeholder="np. sklep / kto kupuje" style="padding:4px 6px;width:100%"></td></tr>`;
+    html+=`<tr${chk?' style="opacity:.75"':''}><td>${esc(r.c.name)}${effGroup(r.c)?` <span class="muted" style="font-size:11px">⇄ ${esc(effGroup(r.c))}</span>`:''}${xtra?xTag:tog}${chkTag}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="ev">${v?fmtN(v):'<span class="muted">·</span>'}</td>`).join('')}<td class="sum"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right"></td><td class="right"><input type="number" step="any" data-oq="${r.c.id}" value="${ov?n.q:(r.order>0?r.order:'')}" placeholder="${r.order>0?'':'—'}" title="${xtra?'Dokupienie poza agendami':ov?'Nadpisane ręcznie (wyliczone: '+fmtN(r.order)+')':'Wyliczone automatycznie'}" style="padding:4px 6px;width:80px;text-align:right;font-weight:700;color:${oq>0?'var(--acc)':'var(--muted)'};${ov?'border-color:var(--acc)':''}">${ov&&!xtra?`<div class="muted" style="font-size:10px">wyl. ${fmtN(r.order)}</div>`:''}</td><td><input data-oc="${r.c.id}" value="${esc(n.c||'')}" placeholder="np. sklep / kto kupuje" style="padding:4px 6px;width:100%"></td></tr>`;
     if(r.order>0) html+=groupHint(r,NCOL); });
   html+='</tbody></table>';
   // pozycje potrzebne, ale w całości pokryte ze stanu — żeby nie wyglądało, że „zniknęły”
@@ -904,6 +961,8 @@ function renderShop(){
   $('s_table').querySelectorAll('[data-stock]').forEach(i=>i.onchange=async()=>{ const c=CAT.find(x=>x.id===i.dataset.stock); c.stock=i.value===''?null:Number(i.value); await api('PATCH',`catalog?id=eq.${c.id}`,{stock:c.stock,stock_updated_at:new Date().toISOString()},'return=minimal'); renderShop(); toast('Stan zapisany'); });
   // ręczne nadpisanie „do zamówienia” + komentarz — zapisywane per tydzień zakupowy
   const noteSave=async(cid,patch)=>{ SHOP.notes=SHOP.notes||{}; const n=Object.assign({},SHOP.notes[cid]||{},patch); if((n.q==null||n.q==='')&&!(n.c||'').trim()) delete SHOP.notes[cid]; else SHOP.notes[cid]=n; await saveShopNotes(); };
+  $('s_table').querySelectorAll('[data-xdel]').forEach(b=>b.onclick=async()=>{ delete SHOP.notes[b.dataset.xdel]; await saveShopNotes(); renderShop(); toast('Usunięto z dokupień'); });
+  publishShopList(); if(typeof renderShare==='function') renderShare();
   $('s_table').querySelectorAll('[data-buyitem]').forEach(b=>b.onclick=async()=>{ const c=CAT.find(x=>x.id===b.dataset.buyitem); const cur=isBuy(c); const catDefault=(SHOP.buy.cats[c.category]!=null)?!!SHOP.buy.cats[c.category]:BUY_DEFAULT.has(c.category); if(!cur===catDefault) delete SHOP.buy.items[c.id]; else SHOP.buy.items[c.id]=!cur; await saveBuy(); renderShop(); toast(!cur?'Włączono do zakupów':'Wyłączono z zakupów'); });
   $('s_table').querySelectorAll('[data-oq]').forEach(i=>i.onchange=async()=>{ const r=SHOP.rows.find(x=>x.c.id===i.dataset.oq); const v=i.value===''?null:Number(i.value); await noteSave(i.dataset.oq,{q:(v==null||(r&&v===r.order))?null:v}); renderShop(); toast('Zapisano'); });
   $('s_table').querySelectorAll('[data-oc]').forEach(i=>i.onchange=async()=>{ await noteSave(i.dataset.oc,{c:i.value.trim()}); toast('Zapisano'); });

@@ -105,6 +105,7 @@ pre.txt{white-space:pre-wrap;font:inherit;margin:0;line-height:1.5}
     <div id="whList" class="hidden" style="margin-top:22px">
       <h1 style="margin:0 0 4px;font-size:22px">Magazyn — wszystkie eventy</h1>
       <p class="note" style="margin-top:0">Masz dostęp magazynowy: możesz zajrzeć do agendy i pakować każdy nadchodzący event.</p>
+      <a id="whShop" class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px;text-decoration:none;color:inherit;margin-bottom:10px;border-color:var(--acc)"><div><b style="font-size:16px">🛒 Zakupy na ten tydzień</b><div class="note" style="margin:4px 0 0">Lista od Tomka — odhaczaj, co już masz w koszyku.</div></div><span class="pill warn">otwórz</span></a>
       <div id="whItems"></div>
     </div>
     <p class="note" style="margin-top:8px">Plik .ics otwórz na telefonie — eventy dodadzą się do kalendarza Google/Apple.</p>
@@ -539,7 +540,7 @@ async function homeFlow(){
       </div></a>`;
   $('hList').innerHTML=(up.length?up.map(card).join(''):'<p class="note">Na razie brak nadchodzących eventów — Tomek się odezwie.</p>')
     +(past.length?'<p class="note" style="margin:16px 0 8px">Ostatnie eventy:</p>'+past.map(card).join(''):'');
-  try{ const W=await rpc('wh_events',{p_mtoken:mtoken}); if(Array.isArray(W)){ $('whList').classList.remove('hidden');
+  try{ const W=await rpc('wh_events',{p_mtoken:mtoken}); if(Array.isArray(W)){ $('whList').classList.remove('hidden'); $('whShop').href=location.href.replace(/crew\.html.*$/,'zakupy.html')+'?w='+encodeURIComponent(mtoken);
     $('whItems').innerHTML=W.length?W.map(e=>`<a class="card" style="display:block;text-decoration:none;color:inherit;margin-bottom:10px" href="?w=${encodeURIComponent(mtoken)}&ev=${e.id}">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><div><b style="font-size:16px">${esc(e.name)}</b>
         <div class="note" style="margin:4px 0 0">${fmtDate(e.event_date)}${e.event_end_date&&e.event_end_date!==e.event_date?' → '+fmtDate(e.event_end_date):''} · ${esc(e.start_time||'')}${e.end_time?'–'+esc(e.end_time):''}</div>
