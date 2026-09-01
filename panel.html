@@ -9,6 +9,16 @@
 <style>
 :root{--bg:#0d0d0f;--card:#17171b;--card2:#1f1f25;--line:#2a2a32;--txt:#f2f0ea;--muted:#9a9aa6;--acc:#e8b04b;--ok:#4cc38a;--bad:#e5534b;--warn:#e8b04b;--r:14px}
 html.light{--bg:#f4f2ec;--card:#ffffff;--card2:#edeae1;--line:#dcd8cc;--txt:#1d1c18;--muted:#6d6c64;--acc:#b07a14;--ok:#1e8a5a;--bad:#c23b34;--warn:#b07a14}
+/* Zakupy — tabela „excelowa”: pionowe kreski, kolumny eventów wyśrodkowane */
+table.xl{border-collapse:collapse}
+table.xl th,table.xl td{border-right:1px solid var(--line)}
+table.xl th:last-child,table.xl td:last-child{border-right:0}
+table.xl th.ev,table.xl td.ev{text-align:center;min-width:64px}
+table.xl td.ev{font-variant-numeric:tabular-nums}
+table.xl th.sum,table.xl td.sum{text-align:center;background:var(--card2)}
+table.xl tbody tr:not(.cat):hover td{background:color-mix(in srgb,var(--acc) 7%,transparent)}
+table.xl tr.cat td{border-right:0}
+table.xl input[type=number]::-webkit-inner-spin-button{opacity:.4}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,sans-serif;font-size:14px}
 .top{display:flex;align-items:center;gap:18px;padding:12px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
@@ -362,10 +372,11 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
           <button class="btn primary" id="s_run">Policz</button><button class="btn" id="s_thisWeek" title="poniedziałek–niedziela">Ten tydzień</button><button class="btn" id="s_nextWeek">Następny</button>
           <label class="check" style="margin:0"><input type="checkbox" id="s_onlyOrder" checked> tylko do zamówienia</label>
           <div class="sp"></div>
-          <button class="btn" id="s_copy">Kopiuj zamówienie</button><button class="btn" id="s_csv">Kopiuj jako CSV</button> <button class="btn" id="s_snap">Zapisz remanent</button><button class="btn danger" id="s_clear">Wyczyść stan</button>
+          <button class="btn" id="s_copy">Kopiuj zamówienie</button><button class="btn" id="s_csv" title="Plik CSV otwierany w Excelu / Numbers — z kolumną Do zamówienia i Komentarz">Pobierz CSV (Excel)</button> <button class="btn" id="s_snap">Zapisz remanent</button><button class="btn danger" id="s_clear">Wyczyść stan</button>
         </div>
         <p class="muted" style="margin:10px 0 0">Suma ilości z agend eventów w zakresie (statusy wstępny + potwierdzony), minus stan magazynu = do zamówienia. Stan edytujesz bezpośrednio w tabeli (remanent).</p>
         <div id="s_events" class="muted" style="margin-top:6px"></div>
+        <div id="s_buyChips" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"></div>
         <div style="overflow-x:auto;margin-top:10px"><div id="s_table"></div></div>
       </div>
       <div class="card">
@@ -789,9 +800,22 @@ $('pe_save').onclick=async()=>{
 /* ---------- ZAKUPY ---------- */
 let SHOP={events:[],items:[],rows:[]};
 function isoMonday(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); return x.toISOString().slice(0,10); }
+/* kolejność kategorii w Zakupach + które kategorie w ogóle KUPUJEMY (reszta: bary, lód, szkło… — tylko pakowanie) */
+const CAT_ORDER=['ALKOHOLE','PIWO I KEGI','NAPOJE','OWOCE','SYROPY I SOK','KAWA','DODATKI','LÓD','SZKŁO','BAR','CHECK LIST'];
+const catIdx=c=>{ const i=CAT_ORDER.indexOf(c); return i<0?CAT_ORDER.length:i; };
+const BUY_DEFAULT=new Set(['ALKOHOLE','PIWO I KEGI','NAPOJE','OWOCE','SYROPY I SOK','KAWA','DODATKI']);
+function isBuy(c){ const b=SHOP.buy||{cats:{},items:{}}; if(b.items[c.id]!=null) return !!b.items[c.id]; if(b.cats[c.category]!=null) return !!b.cats[c.category]; return BUY_DEFAULT.has(c.category); }
+async function loadBuy(){ SHOP.buy={cats:{},items:{}}; try{ const [row]=await api('GET','settings?key=eq.shop_buy&select=value'); if(row&&row.value){ const v=JSON.parse(row.value); SHOP.buy={cats:v.cats||{},items:v.items||{}}; } }catch(e){} }
+async function saveBuy(){ await api('POST','settings?on_conflict=key',{key:'shop_buy',value:JSON.stringify(SHOP.buy)},'resolution=merge-duplicates,return=minimal'); }
+function renderBuyChips(){
+  const cats=[...new Set(CAT.map(c=>c.category))].sort((a,b)=>catIdx(a)-catIdx(b)||a.localeCompare(b,'pl'));
+  $('s_buyChips').innerHTML=`<span class="muted" style="font-size:12px">Kupujemy:</span>`+cats.map(cat=>{ const on=isBuy({id:'',category:cat}); return `<button class="btn sm" data-buycat="${esc(cat)}" title="${on?'Kliknij, żeby wyłączyć z zakupów (zostaje w pakowaniu)':'Kliknij, żeby włączyć do zakupów'}" style="${on?'border-color:var(--ok);color:var(--ok)':'opacity:.5;text-decoration:line-through'}">${on?'✓ ':''}${esc(cat)}</button>`; }).join('');
+  $('s_buyChips').querySelectorAll('[data-buycat]').forEach(b=>b.onclick=async()=>{ const cat=b.dataset.buycat; SHOP.buy.cats[cat]=!isBuy({id:'',category:cat}); Object.keys(SHOP.buy.items).forEach(id=>{ const c=CAT.find(x=>x.id===id); if(c&&c.category===cat) delete SHOP.buy.items[id]; }); await saveBuy(); renderBuyChips(); renderShop(); });
+}
 async function loadShop(){
   if(!CAT.length) await loadCatalog();
   if(!$('s_from').value) setWeek(0);
+  await loadBuy(); renderBuyChips();
   await runShop(); loadSnaps(); renderMag();
 }
 function setWeek(offset){ const m=new Date(isoMonday(new Date())); m.setDate(m.getDate()+7*offset); const t=new Date(m); t.setDate(t.getDate()+6); $('s_from').value=m.toISOString().slice(0,10); $('s_to').value=t.toISOString().slice(0,10); }
@@ -801,7 +825,20 @@ async function runShop(){
   const ids=SHOP.events.map(e=>e.id);
   SHOP.items = ids.length ? await api('GET',`packing_items?select=event_id,catalog_id,name,unit,qty_num,note&event_id=in.(${ids.join(',')})&qty_num=not.is.null`) : [];
   $('s_events').textContent = SHOP.events.length ? 'Eventy: '+SHOP.events.map(e=>`${e.name} (${e.event_date})`).join(' · ') : 'Brak eventów w tym zakresie.';
+  SHOP.notesKey=`shop_${f}_${t}`; SHOP.notes={};
+  try{ const [row]=await api('GET',`settings?key=eq.${SHOP.notesKey}&select=value`); if(row&&row.value) SHOP.notes=JSON.parse(row.value)||{}; }catch(e){ SHOP.notes={}; }
   renderShop();
+}
+async function saveShopNotes(){
+  if(!SHOP.notesKey) return;
+  await api('POST','settings?on_conflict=key',{key:SHOP.notesKey,value:JSON.stringify(SHOP.notes||{})},'resolution=merge-duplicates,return=minimal');
+}
+function shopExportRows(){ // wiersze do CSV / zamówienia (z ręcznym nadpisaniem i komentarzem)
+  const N=SHOP.notes||{};
+  return SHOP.rows.filter(r=>isBuy(r.c)).map(r=>{ const n=N[r.c.id]||{}; const ov=n.q!=null&&n.q!==''; return {r, order: ov?Number(n.q):r.order, comment:n.c||'', overridden:ov}; });
+}
+function downloadFile(name, text, mime){
+  const blob=new Blob([text],{type:mime||'text/plain;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
 }
 /* zgadywanie grupy po nazwie (gdy nie przypisano ręcznie) — np. „Tequilla Jose Cuervo” → TEQUILA */
 function guessGroup(name){
@@ -821,8 +858,9 @@ function renderShop(){
   const byName={}; CAT.forEach(c=>byName[mNorm(c.name)]=c);
   SHOP.items.forEach(i=>{ i._cid = i.catalog_id || byName[mNorm(i.name||'')]?.id || null; });
   const all = CAT.map(c=>{ const per=evs.map(e=>SHOP.items.filter(i=>i.event_id===e.id&&i._cid===c.id).reduce((a,i)=>a+Number(i.qty_num||0),0)); const need=per.reduce((a,b)=>a+b,0); const stock=c.stock==null?0:Number(c.stock); return {c,per,need,stock,order:Math.max(need-stock,0)}; });
-  const covered = all.filter(r=>r.need>0 && r.order===0);
-  SHOP.rows = all.filter(r=>r.need>0 || (!only && r.stock>0)).filter(r=>!only || r.order>0);
+  all.sort((a,b)=>catIdx(a.c.category)-catIdx(b.c.category)||a.c.category.localeCompare(b.c.category,'pl')||(a.c.sort||0)-(b.c.sort||0)||a.c.name.localeCompare(b.c.name,'pl'));
+  const covered = all.filter(r=>r.need>0 && r.order===0 && isBuy(r.c));
+  SHOP.rows = all.filter(r=>r.need>0 || (!only && r.stock>0)).filter(r=>!only || (r.order>0 && isBuy(r.c)));
   // grupy zamienników: potrzeba i stan liczone dla całej grupy (np. WÓDKA); grupa jawna albo zgadnięta z nazwy
   const gNeed={}, gShown=new Set();
   all.forEach(r=>{ const g=effGroup(r.c); if(g&&r.need>0) gNeed[g]=(gNeed[g]||0)+r.need; });
@@ -836,10 +874,15 @@ function renderShop(){
     const list=others.map(c=>`<b>${esc(c.name)}</b> — ${fmtN(Number(c.stock))} ${esc(c.unit||'')}${c.price!=null?` (${fmtN(Number(c.price))} zł)`:''} <button class="btn sm" data-sub="${r.c.id}|${c.id}" title="Podmień „${esc(r.c.name)}” na „${esc(c.name)}” w agendach eventów z tego zakresu">Podstaw</button>`).join(' &nbsp; ');
     return `<tr><td colspan="${colspan}" style="padding:6px 10px 10px;border-left:3px solid var(--acc)"><span style="color:var(--acc);font-weight:700">⇄ ${esc(g)}</span> <span class="muted">— masz w grupie:</span> ${list}<br><span class="muted">Cała grupa: potrzeba ${fmtN(gNeed[g]||0)} · stan ${fmtN(gStock)} → realnie do kupienia: </span><b style="color:${realOrder>0?'var(--acc)':'var(--ok)'}">${realOrder>0?fmtN(realOrder):'nic — podstaw z grupy'}</b></td></tr>`;
   };
-  let cat=null, html=`<table><thead><tr><th>Pozycja</th><th>Jedn.</th>${evs.map(e=>`<th title="${esc(e.name)}">${esc(e.name.slice(0,14))}<br><span class="muted">${e.event_date.slice(5)}</span></th>`).join('')}<th class="right">Razem</th><th class="right" style="width:90px">Stan</th><th class="right">Do zamówienia</th></tr></thead><tbody>`;
-  SHOP.rows.forEach(r=>{ if(r.c.category!==cat){ cat=r.c.category; html+=`<tr><td colspan="${evs.length+5}" style="color:var(--acc);font-weight:700;padding-top:12px">${esc(cat)}</td></tr>`; }
-    html+=`<tr><td>${esc(r.c.name)}${effGroup(r.c)?` <span class="muted" style="font-size:11px">⇄ ${esc(effGroup(r.c))}</span>`:''}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="right muted">${v?fmtN(v):''}</td>`).join('')}<td class="right"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right"></td><td class="right" style="color:${r.order>0?'var(--acc)':'var(--muted)'};font-weight:700">${r.order>0?fmtN(r.order):'—'}</td></tr>`;
-    if(r.order>0) html+=groupHint(r,evs.length+5); });
+  const NCOL=evs.length+6; // Pozycja, Jedn., eventy…, Razem, Stan, Do zamówienia, Komentarz
+  const N=SHOP.notes||{};
+  let cat=null, html=`<table class="xl"><thead><tr><th>Pozycja</th><th>Jedn.</th>${evs.map(e=>`<th class="ev" title="${esc(e.name)}">${esc(e.name.slice(0,14))}<br><span class="muted">${e.event_date.slice(5)}</span></th>`).join('')}<th class="sum">Razem</th><th class="right" style="width:100px" title="Stan magazynu z ostatniego remanentu (całościowy) — możesz poprawić tutaj">Stan<br><span class="muted" style="font-weight:400;text-transform:none">remanent</span></th><th class="right" style="width:110px" title="Wyliczone: Razem − Stan. Możesz nadpisać własną liczbą.">Do zamówienia</th><th style="min-width:160px">Komentarz</th></tr></thead><tbody>`;
+  SHOP.rows.forEach(r=>{ if(r.c.category!==cat){ cat=r.c.category; html+=`<tr class="cat"><td colspan="${NCOL}" style="color:var(--acc);font-weight:700;padding-top:12px">${esc(cat)}</td></tr>`; }
+    const n=N[r.c.id]||{}; const ov=n.q!=null&&n.q!==''; const oq=ov?Number(n.q):r.order; const buy=isBuy(r.c);
+    const tog=`<button class="btn sm" data-buyitem="${r.c.id}" title="${buy?'Wyłącz tę pozycję z zakupów (zostaje w pakowaniu)':'Włącz tę pozycję do zakupów'}" style="padding:1px 6px;font-size:11px;margin-left:6px;opacity:.7">${buy?'🛒':'✕'}</button>`;
+    if(!buy){ html+=`<tr style="opacity:.55"><td>${esc(r.c.name)}${tog}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="ev">${v?fmtN(v):'<span class="muted">·</span>'}</td>`).join('')}<td class="sum"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right"></td><td class="right muted" style="font-size:12px">nie kupujemy</td><td></td></tr>`; return; }
+    html+=`<tr><td>${esc(r.c.name)}${effGroup(r.c)?` <span class="muted" style="font-size:11px">⇄ ${esc(effGroup(r.c))}</span>`:''}${tog}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="ev">${v?fmtN(v):'<span class="muted">·</span>'}</td>`).join('')}<td class="sum"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right"></td><td class="right"><input type="number" step="any" data-oq="${r.c.id}" value="${ov?n.q:(r.order>0?r.order:'')}" placeholder="${r.order>0?'':'—'}" title="${ov?'Nadpisane ręcznie (wyliczone: '+fmtN(r.order)+')':'Wyliczone automatycznie'}" style="padding:4px 6px;width:80px;text-align:right;font-weight:700;color:${oq>0?'var(--acc)':'var(--muted)'};${ov?'border-color:var(--acc)':''}">${ov?`<div class="muted" style="font-size:10px">wyl. ${fmtN(r.order)}</div>`:''}</td><td><input data-oc="${r.c.id}" value="${esc(n.c||'')}" placeholder="np. sklep / kto kupuje" style="padding:4px 6px;width:100%"></td></tr>`;
+    if(r.order>0) html+=groupHint(r,NCOL); });
   html+='</tbody></table>';
   // pozycje potrzebne, ale w całości pokryte ze stanu — żeby nie wyglądało, że „zniknęły”
   if(only && covered.length) html+=`<p class="muted" style="margin:10px 0 0"><b style="color:var(--ok)">✓ Pokryte ze stanu magazynu</b> (nie kupujesz, ale pakujesz): ${covered.map(r=>`${esc(r.c.name)} — ${fmtN(r.need)} ${esc(r.c.unit||'')} (stan ${fmtN(r.stock)})`).join(' · ')}</p>`;
@@ -859,6 +902,11 @@ function renderShop(){
     toast('Podpięto do katalogu'); await loadCatalog(); await runShop();
   });
   $('s_table').querySelectorAll('[data-stock]').forEach(i=>i.onchange=async()=>{ const c=CAT.find(x=>x.id===i.dataset.stock); c.stock=i.value===''?null:Number(i.value); await api('PATCH',`catalog?id=eq.${c.id}`,{stock:c.stock,stock_updated_at:new Date().toISOString()},'return=minimal'); renderShop(); toast('Stan zapisany'); });
+  // ręczne nadpisanie „do zamówienia” + komentarz — zapisywane per tydzień zakupowy
+  const noteSave=async(cid,patch)=>{ SHOP.notes=SHOP.notes||{}; const n=Object.assign({},SHOP.notes[cid]||{},patch); if((n.q==null||n.q==='')&&!(n.c||'').trim()) delete SHOP.notes[cid]; else SHOP.notes[cid]=n; await saveShopNotes(); };
+  $('s_table').querySelectorAll('[data-buyitem]').forEach(b=>b.onclick=async()=>{ const c=CAT.find(x=>x.id===b.dataset.buyitem); const cur=isBuy(c); const catDefault=(SHOP.buy.cats[c.category]!=null)?!!SHOP.buy.cats[c.category]:BUY_DEFAULT.has(c.category); if(!cur===catDefault) delete SHOP.buy.items[c.id]; else SHOP.buy.items[c.id]=!cur; await saveBuy(); renderShop(); toast(!cur?'Włączono do zakupów':'Wyłączono z zakupów'); });
+  $('s_table').querySelectorAll('[data-oq]').forEach(i=>i.onchange=async()=>{ const r=SHOP.rows.find(x=>x.c.id===i.dataset.oq); const v=i.value===''?null:Number(i.value); await noteSave(i.dataset.oq,{q:(v==null||(r&&v===r.order))?null:v}); renderShop(); toast('Zapisano'); });
+  $('s_table').querySelectorAll('[data-oc]').forEach(i=>i.onchange=async()=>{ await noteSave(i.dataset.oc,{c:i.value.trim()}); toast('Zapisano'); });
   $('s_table').querySelectorAll('[data-sub]').forEach(b=>b.onclick=async()=>{
     const [srcId,tgtId]=b.dataset.sub.split('|');
     const src=CAT.find(x=>x.id===srcId), tgt=CAT.find(x=>x.id===tgtId);
@@ -872,8 +920,15 @@ function renderShop(){
 }
 $('s_run').onclick=runShop; $('s_onlyOrder').onchange=renderShop; $('s_from').onchange=runShop; $('s_to').onchange=runShop;
 $('s_thisWeek').onclick=()=>{ setWeek(0); runShop(); }; $('s_nextWeek').onclick=()=>{ setWeek(1); runShop(); };
-$('s_copy').onclick=()=>{ const lines=[]; let cat=null; SHOP.rows.filter(r=>r.order>0).forEach(r=>{ if(r.c.category!==cat){cat=r.c.category; lines.push('\n'+cat);} lines.push(`${r.c.name} — ${fmtN(r.order)} ${r.c.unit||''}`); }); navigator.clipboard.writeText(`ZAMÓWIENIE PMB ${$('s_from').value} – ${$('s_to').value}${lines.join('\n')}`); toast('Skopiowano'); };
-$('s_csv').onclick=()=>{ const evs=SHOP.events; const head=['Kategoria','Pozycja','Jedn.',...evs.map(e=>e.name),'Razem','Stan','Do zamówienia']; const rows=SHOP.rows.map(r=>[r.c.category,r.c.name,r.c.unit||'',...r.per,r.need,r.stock,r.order]); navigator.clipboard.writeText([head,...rows].map(r=>r.map(x=>`"${String(x??'').replace(/"/g,'""')}"`).join(';')).join('\n')); toast('CSV skopiowany'); };
+$('s_copy').onclick=()=>{ const lines=[]; let cat=null; shopExportRows().filter(x=>x.order>0).forEach(({r,order,comment})=>{ if(r.c.category!==cat){cat=r.c.category; lines.push('\n'+cat);} lines.push(`${r.c.name} — ${fmtN(order)} ${r.c.unit||''}${comment?'  ('+comment+')':''}`); }); navigator.clipboard.writeText(`ZAMÓWIENIE PMB ${$('s_from').value} – ${$('s_to').value}${lines.join('\n')}`); toast('Skopiowano'); };
+$('s_csv').onclick=()=>{
+  const evs=SHOP.events, f=$('s_from').value, t=$('s_to').value;
+  const head=['Kategoria','Pozycja','Jedn.',...evs.map(e=>`${e.name} (${e.event_date})`),'Razem','Stan','Do zamówienia','Komentarz'];
+  const num=x=>(x==null||x==='')?'':String(x).replace('.',','); // przecinek dziesiętny dla polskiego Excela
+  const rows=shopExportRows().map(({r,order,comment})=>[r.c.category,r.c.name,r.c.unit||'',...r.per.map(v=>v?num(v):''),num(r.need),r.c.stock==null?'':num(r.stock),order>0?num(order):'',comment]);
+  const csv='﻿'+[head,...rows].map(row=>row.map(x=>`"${String(x??'').replace(/"/g,'""')}"`).join(';')).join('\r\n');
+  downloadFile(`zamowienie_PMB_${f}_${t}.csv`, csv, 'text/csv;charset=utf-8'); toast('Pobrano plik CSV');
+};
 
 /* ---------- REMANENTY ---------- */
 async function loadSnaps(){
