@@ -117,31 +117,18 @@ ul.list{margin:0;padding-left:18px}ul.list li{margin:3px 0}
     <div class="foot"><span>Pimp My Bar · agenda eventu</span><span id="gen"></span></div>
   </div>
 </div>
+<script src="pmb-core.js"></script>
 <script>
-const SUPABASE_URL='https://zqpqjgxtefzojhjglppb.supabase.co', SUPABASE_KEY='sb_publishable__bPrQF9K35vs8RbLdWBRXQ_VBVj2esQ';
-const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const id=new URLSearchParams(location.search).get('id');
-async function freshSession(){
-  let s=null; try{ s=JSON.parse(localStorage.getItem('pmb_session')||'null'); }catch(e){}
-  if(!s) return null;
-  if(s.expires_at*1000 - Date.now() > 60000) return s;
-  try{
-    const r=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,{method:'POST',headers:{'apikey':SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:s.refresh_token})});
-    if(!r.ok) return null; s=await r.json(); localStorage.setItem('pmb_session',JSON.stringify(s)); return s;
-  }catch(e){ return null; }
-}
-let sess=null;
-async function api(path){ const r=await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+(sess?sess.access_token:SUPABASE_KEY)}}); if(!r.ok) throw new Error(await r.text()); return r.json(); }
 const MON=['STY','LUT','MAR','KWI','MAJ','CZE','LIP','SIE','WRZ','PAŹ','LIS','GRU'], DAYS=['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
-const fmtN=n=>n==null?'':Number(n).toLocaleString('pl-PL',{maximumFractionDigits:2});
 function kv(el, rows){ el.innerHTML=rows.filter(r=>r[1]!==undefined&&r[1]!==null&&r[1]!=='').map(r=>`<div class="k">${r[0]}</div><div class="v">${r[2]?r[1]:esc(r[1])}</div>`).join(''); }
 function tbd(v){ return !v||/ustalen/i.test(v); }
 function stage(el, t, x){ const T=el.querySelector('.t'); T.textContent=tbd(t)?'do ustalenia':t; T.classList.toggle('tbd',tbd(t)); el.querySelector('.x').innerHTML=x||''; }
 (async()=>{
-  sess=await freshSession();
-  if(!id||!sess){ $('loading').innerHTML='Sesja wygasła albo nie jesteś zalogowany — <a href="panel.html" style="color:var(--acc)">zaloguj się w panelu</a> i otwórz agendę ponownie.'; return; }
+  const ok=await ensureSession();
+  if(!id||!ok){ $('loading').innerHTML='Sesja wygasła albo nie jesteś zalogowany — <a href="panel.html" style="color:var(--acc)">zaloguj się w panelu</a> i otwórz agendę ponownie.'; return; }
   let e, asg, items, set;
-  try{ [e]=await api(`events?id=eq.${id}&select=*`); asg=await api(`assignments?select=*,crew(first_name,last_name,phone)&event_id=eq.${id}&order=role,created_at`); items=await api(`packing_items?select=*&event_id=eq.${id}&order=category,sort`); set=await api(`settings?select=*`); }
+  try{ [e]=await apiGet(`events?id=eq.${id}&select=*`); asg=await apiGet(`assignments?select=*,crew(first_name,last_name,phone)&event_id=eq.${id}&order=role,created_at`); items=await apiGet(`packing_items?select=*&event_id=eq.${id}&order=category,sort`); set=await apiGet(`settings?select=*`); }
   catch(err){ $('loading').textContent='Błąd: '+err.message; return; }
   const S={}; set.forEach(s=>S[s.key]=s.value);
   $('loading').classList.add('hidden'); $('app').classList.remove('hidden');

@@ -421,6 +421,14 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center"><button class="btn sm" id="set_recruitCopy">Kopiuj link</button><label class="check" style="margin:0"><input type="checkbox" id="set_recruitOpen"> Nabór otwarty</label></div>
       </div>
       <div class="card">
+        <h2>Organizacja</h2>
+        <p class="muted" style="margin-top:0">Marka widoczna w logo na stronach ekipy; kolejność kategorii i kategorie kupowane domyślnie w zakładce Zakupy.</p>
+        <label>Nazwa marki (logo na stronach)</label><input id="set_brand" style="width:280px">
+        <label>Kolejność kategorii w zakupach (po przecinku)</label><input id="set_catOrder" style="width:100%">
+        <label>Kategorie kupowane domyślnie (po przecinku)</label><input id="set_buyDefault" style="width:100%">
+        <div style="margin-top:8px"><button class="btn primary" id="set_saveOrg">Zapisz organizację</button></div>
+      </div>
+      <div class="card">
         <h2>Warunki współpracy</h2>
         <p class="muted" style="margin-top:0">Widoczne w linku rekrutacyjnym i przy pierwszym evencie każdej osoby (z checkboxem akceptacji, data zapisuje się przy osobie). Nagłówki sekcji to linie bez numeru.</p>
         <textarea id="set_terms" style="min-height:320px;font-size:13px;line-height:1.5"></textarea>
@@ -448,13 +456,11 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
 </div>
 <div id="toast" class="toast hidden"></div>
 
+<script src="pmb-core.js"></script>
 <script>
-const SUPABASE_URL = 'https://zqpqjgxtefzojhjglppb.supabase.co';
-const SUPABASE_KEY = 'sb_publishable__bPrQF9K35vs8RbLdWBRXQ_VBVj2esQ';
-const $ = id => document.getElementById(id);
-const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const money = n => n==null?'—':Number(n).toLocaleString('pl-PL')+' zł';
-let session = null, events=[], people=[], cur=null, asgs=[], curPerson=null;
+let events=[], people=[], cur=null, asgs=[], curPerson=null;
+let ORG=null;   // wiersz orgs zalogowanego użytkownika (od update27)
 const CREW_URL_DEFAULT = 'https://pimpmybar.github.io/pmb-crew/crew.html';
 const crewUrl = () => { const saved = localStorage.getItem('pmb_crew_url'); if (saved && /^https?:\/\//.test(saved)) return saved;
   if (location.protocol === 'file:') return CREW_URL_DEFAULT;
@@ -462,32 +468,13 @@ const crewUrl = () => { const saved = localStorage.getItem('pmb_crew_url'); if (
 
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'),2200); }
 
-/* ---------- AUTH ---------- */
-async function auth(path, body){
-  const r = await fetch(`${SUPABASE_URL}/auth/v1/${path}`,{method:'POST',headers:{'apikey':SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const j = await r.json(); if(!r.ok) throw new Error(j.error_description||j.msg||j.error||'auth'); return j;
-}
-function saveSession(s){ session=s; localStorage.setItem('pmb_session',JSON.stringify(s)); }
-async function ensureSession(){
-  const s = JSON.parse(localStorage.getItem('pmb_session')||'null'); if(!s) return false;
-  if(s.expires_at*1000 - Date.now() > 60000){ session=s; return true; }
-  try { saveSession(await auth('token?grant_type=refresh_token',{refresh_token:s.refresh_token})); return true; } catch(e){ return false; }
-}
+/* ---------- AUTH (sesja w pmb-core.js) ---------- */
 $('l_btn').onclick = async()=>{
   $('l_err').textContent=''; try { saveSession(await auth('token?grant_type=password',{email:$('l_email').value.trim(),password:$('l_pass').value})); start(); }
   catch(e){ $('l_err').textContent='Nie udało się zalogować: '+e.message; }
 };
 $('l_pass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('l_btn').click(); });
 $('logout').onclick = ()=>{ localStorage.removeItem('pmb_session'); location.reload(); };
-
-/* ---------- REST ---------- */
-async function api(method, path, body, prefer){
-  if(session && session.expires_at*1000 - Date.now() < 60000) await ensureSession();
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{method,headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json','Prefer':prefer||'return=representation'},body: body?JSON.stringify(body):undefined});
-  if(r.status===401){ localStorage.removeItem('pmb_session'); location.reload(); return; }
-  if(!r.ok) throw new Error(await r.text());
-  const t = await r.text(); return t? JSON.parse(t) : null;
-}
 
 /* ---------- TABS ---------- */
 document.querySelectorAll('.top .tabs button').forEach(b=>b.onclick=()=>{
@@ -714,7 +701,6 @@ async function loadCatalog(){ CAT = await api('GET','catalog?select=*&active=eq.
   const grps=[...new Set([...CAT.map(c=>c.group_name).filter(Boolean),'WÓDKA','GIN','TEQUILA','RUM','WHISKY','PROSECCO','LIKIERY'])].sort();
   const gl=document.getElementById('grpList'); if(gl) gl.innerHTML=grps.map(g=>`<option value="${esc(g)}">`).join('');
 }
-function fmtN(n){ return n==null?'':Number(n).toLocaleString('pl-PL',{maximumFractionDigits:2}); }
 function renderGrid(){
   const q=$('q_search').value.toLowerCase(), only=$('q_onlyFilled').checked;
   const byCat={}; CAT.forEach(c=>{ const it=PK.find(p=>p.catalog_id===c.id); if(only && !(it&&(it.qty_num!=null||it.note))) return; if(q && !c.name.toLowerCase().includes(q)) return; (byCat[c.category]=byCat[c.category]||[]).push({c,it}); });
@@ -814,12 +800,12 @@ $('pe_save').onclick=async()=>{
 let SHOP={events:[],items:[],rows:[]};
 function isoMonday(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); return x.toISOString().slice(0,10); }
 /* kolejność kategorii w Zakupach + które kategorie w ogóle KUPUJEMY (reszta: bary, lód, szkło… — tylko pakowanie) */
-const CAT_ORDER=['ALKOHOLE','PIWO I KEGI','NAPOJE','OWOCE','SYROPY I SOK','KAWA','DODATKI','LÓD','SZKŁO','BAR','CHECK LIST'];
+let CAT_ORDER=['ALKOHOLE','PIWO I KEGI','NAPOJE','OWOCE','SYROPY I SOK','KAWA','DODATKI','LÓD','SZKŁO','BAR','CHECK LIST']; // awaryjnie; nadpisywane z orgs.config w loadOrg()
 const catIdx=c=>{ const i=CAT_ORDER.indexOf(c); return i<0?CAT_ORDER.length:i; };
-const BUY_DEFAULT=new Set(['ALKOHOLE','PIWO I KEGI','NAPOJE','OWOCE','SYROPY I SOK','KAWA','DODATKI']);
+let BUY_DEFAULT=new Set(['ALKOHOLE','PIWO I KEGI','NAPOJE','OWOCE','SYROPY I SOK','KAWA','DODATKI']);
 function isBuy(c){ const b=SHOP.buy||{cats:{},items:{}}; if(b.items[c.id]!=null) return !!b.items[c.id]; if(b.cats[c.category]!=null) return !!b.cats[c.category]; return BUY_DEFAULT.has(c.category); }
 async function loadBuy(){ SHOP.buy={cats:{},items:{}}; try{ const [row]=await api('GET','settings?key=eq.shop_buy&select=value'); if(row&&row.value){ const v=JSON.parse(row.value); SHOP.buy={cats:v.cats||{},items:v.items||{}}; } }catch(e){} }
-async function saveBuy(){ await api('POST','settings?on_conflict=key',{key:'shop_buy',value:JSON.stringify(SHOP.buy)},'resolution=merge-duplicates,return=minimal'); }
+async function saveBuy(){ await api('POST','settings?on_conflict=org_id,key',{key:'shop_buy',value:JSON.stringify(SHOP.buy)},'resolution=merge-duplicates,return=minimal'); }
 function renderBuyChips(){
   const cats=[...new Set(CAT.map(c=>c.category))].sort((a,b)=>catIdx(a)-catIdx(b)||a.localeCompare(b,'pl'));
   $('s_buyChips').innerHTML=`<span class="muted" style="font-size:12px">Kupujemy:</span>`+cats.map(cat=>{ const on=isBuy({id:'',category:cat}); return `<button class="btn sm" data-buycat="${esc(cat)}" title="${on?'Kliknij, żeby wyłączyć z zakupów (zostaje w pakowaniu)':'Kliknij, żeby włączyć do zakupów'}" style="${on?'border-color:var(--ok);color:var(--ok)':'opacity:.5;text-decoration:line-through'}">${on?'✓ ':''}${esc(cat)}</button>`; }).join('');
@@ -868,7 +854,7 @@ function publishShopList(){
   pubT=setTimeout(async()=>{
     const items=shopExportRows().filter(x=>x.order>0).map(({r,order,comment})=>({key:r.c.id,category:r.c.category,name:r.c.name,unit:r.c.unit||'',qty:order,comment:comment||'',extra:isExtraId(r.c.id)}));
     const sig=SHOP.notesKey+'|'+JSON.stringify(items); if(sig===lastPub) return;
-    try{ await api('POST','shop_lists?on_conflict=week_key',{week_key:SHOP.notesKey.replace(/^shop_/,''),week_from:$('s_from').value,week_to:$('s_to').value,items,updated_at:new Date().toISOString()},'resolution=merge-duplicates,return=minimal'); lastPub=sig; }
+    try{ await api('POST','shop_lists?on_conflict=org_id,week_key',{week_key:SHOP.notesKey.replace(/^shop_/,''),week_from:$('s_from').value,week_to:$('s_to').value,items,updated_at:new Date().toISOString()},'resolution=merge-duplicates,return=minimal'); lastPub=sig; }
     catch(e){ /* brak update26 — lista po prostu nie jest publikowana */ }
   },1200);
 }
@@ -886,7 +872,7 @@ async function runShop(){
 }
 async function saveShopNotes(){
   if(!SHOP.notesKey) return;
-  await api('POST','settings?on_conflict=key',{key:SHOP.notesKey,value:JSON.stringify(SHOP.notes||{})},'resolution=merge-duplicates,return=minimal');
+  await api('POST','settings?on_conflict=org_id,key',{key:SHOP.notesKey,value:JSON.stringify(SHOP.notes||{})},'resolution=merge-duplicates,return=minimal');
 }
 function shopExportRows(){ // wiersze do CSV / zamówienia (z ręcznym nadpisaniem i komentarzem)
   const N=SHOP.notes||{};
@@ -1133,8 +1119,7 @@ document.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{ MV=b.dataset.m
 $('m_q').oninput=()=>renderMag();
 
 /* ---------- MOTYW ---------- */
-if(localStorage.getItem('pmb_theme')==='light') document.documentElement.classList.add('light');
-$('themeBtn').onclick=()=>{ const l=document.documentElement.classList.toggle('light'); localStorage.setItem('pmb_theme', l?'light':'dark'); };
+initTheme('themeBtn');
 
 /* ---------- MENU / RECEPTURY ---------- */
 let RCP=[], curR=null;
@@ -1195,21 +1180,36 @@ $('set_save').onclick=()=>{ localStorage.setItem('pmb_crew_url',$('set_url').val
 async function loadSettings(){
   const rows = await api('GET','settings?select=*'); const S={}; rows.forEach(r=>S[r.key]=r.value);
   $('set_terms').value=S.terms||''; $('set_wh').value=S.warehouse||''; $('set_recruitOpen').checked=(S.recruit_open||'true')==='true';
-  const link=`${crewUrl()}?r=1`; $('set_recruit').textContent=link;
+  const link=`${crewUrl()}?r=1&o=${encodeURIComponent(ORG?ORG.slug:DEFAULT_ORG_SLUG)}`; $('set_recruit').textContent=link;
   const stockLink=S.stock_key?`${crewUrl().replace(/crew\.html$/,'remanent.html')}?k=${S.stock_key}`:'uruchom update19.sql w Supabase';
   $('set_stock').value=stockLink;
   $('set_stockCopy').onclick=()=>{ if(S.stock_key){ navigator.clipboard.writeText(stockLink); toast('Link skopiowany'); } };
   $('set_stockNew').onclick=async()=>{ if(!confirm('Wygenerować nowy link do remanentu? Stary przestanie działać.')) return; const k=[...crypto.getRandomValues(new Uint8Array(8))].map(b=>b.toString(16).padStart(2,'0')).join(''); await saveSetting('stock_key',k); toast('Nowy link gotowy'); loadSettings(); };
   $('set_recruitCopy').onclick=()=>{ navigator.clipboard.writeText(link); toast('Link skopiowany'); };
+  if(ORG){ const c=ORG.config||{}; $('set_brand').value=c.brand||ORG.name||''; $('set_catOrder').value=CAT_ORDER.join(', '); $('set_buyDefault').value=[...BUY_DEFAULT].join(', '); }
 }
+$('set_saveOrg').onclick=async()=>{
+  if(!ORG){ toast('Brak organizacji — uruchom update27.sql w Supabase'); return; }
+  const split=s=>s.split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
+  const config=Object.assign({},ORG.config||{},{brand:$('set_brand').value.trim(),cat_order:split($('set_catOrder').value),buy_default:split($('set_buyDefault').value)});
+  await api('PATCH',`orgs?id=eq.${ORG.id}`,{config},'return=minimal'); await loadOrg(); toast('Zapisano organizację');
+};
 async function saveSetting(key,value){ await api('POST','settings',{key,value,updated_at:new Date().toISOString()},'resolution=merge-duplicates,return=minimal'); }
 $('set_saveAll').onclick=async()=>{ await saveSetting('terms',$('set_terms').value); await saveSetting('warehouse',$('set_wh').value); toast('Zapisano'); };
 $('set_recruitOpen').onchange=async()=>{ await saveSetting('recruit_open',$('set_recruitOpen').checked?'true':'false'); toast($('set_recruitOpen').checked?'Nabór otwarty':'Nabór zamknięty'); };
 
 /* ---------- START ---------- */
+async function loadOrg(){
+  try{ const [o]=await api('GET','orgs?select=*&limit=1'); if(!o) return; ORG=o; const c=o.config||{};
+    if(Array.isArray(c.cat_order)&&c.cat_order.length) CAT_ORDER=c.cat_order;
+    if(Array.isArray(c.buy_default)) BUY_DEFAULT=new Set(c.buy_default);
+    applyBrand(c.brand||o.name);
+  }catch(e){ /* brak update27 — zostają wartości z kodu */ }
+}
 async function start(){
   $('loginView').classList.add('hidden'); $('appView').classList.remove('hidden');
   $('set_url').value=crewUrl();
+  await loadOrg();
   try { await loadPeople(); await loadEvents(); } catch(e){ alert('Błąd połączenia z bazą: '+e.message); return; }
   if(events.length) openEvent(events[0].id);
 }

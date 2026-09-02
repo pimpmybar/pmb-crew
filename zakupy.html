@@ -68,21 +68,14 @@ select{background:var(--card2);color:var(--txt);border:1px solid var(--line);bor
 </div>
 <div class="sticky hidden" id="foot"><div><span class="note">W koszyku</span><br><b id="footN">0/0</b></div><div class="note" id="footLeft"></div></div>
 <div class="toast" id="toast"></div>
+<script src="pmb-core.js"></script>
 <script>
-const SUPABASE_URL='https://zqpqjgxtefzojhjglppb.supabase.co';
-const SUPABASE_KEY='sb_publishable__bPrQF9K35vs8RbLdWBRXQ_VBVj2esQ';
-const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmtN=n=>n==null?'':Number(n).toLocaleString('pl-PL',{maximumFractionDigits:2});
-const fmtD=d=>d?new Date(d+'T00:00:00').toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit'}):'';
-async function rpc(fn,args){ const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`,{method:'POST',headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify(args)}); if(!r.ok) throw new Error(await r.text()); const t=await r.text(); return t?JSON.parse(t):null; }
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'),1600); }
-if(localStorage.getItem('pmb_theme')==='light') document.documentElement.classList.add('light');
-$('themeBtn').onclick=()=>{ const l=document.documentElement.classList.toggle('light'); localStorage.setItem('pmb_theme',l?'light':'dark'); };
+initTheme('themeBtn');
 
 const P=new URLSearchParams(location.search); const W=P.get('w'); let WEEK=P.get('week')||null;
 let D=null, hideDone=localStorage.getItem('pmb_shop_hide')==='1', q='';
-const CAT_ORDER=['ALKOHOLE','PIWO I KEGI','NAPOJE','OWOCE','SYROPY I SOK','KAWA','DODATKI','LÓD','SZKŁO','BAR','CHECK LIST'];
+let CAT_ORDER=['ALKOHOLE','PIWO I KEGI','NAPOJE','OWOCE','SYROPY I SOK','KAWA','DODATKI','LÓD','SZKŁO','BAR','CHECK LIST']; // awaryjnie; nadpisywane z shop_get().org.cat_order
 const catIdx=c=>{ const i=CAT_ORDER.indexOf(c); return i<0?CAT_ORDER.length:i; };
 
 async function load(){
@@ -94,6 +87,7 @@ async function load(){
 }
 function render(){
   const L=D.list; const checks=D.checks||{};
+  if(D.org){ if(Array.isArray(D.org.cat_order)&&D.org.cat_order.length) CAT_ORDER=D.org.cat_order; applyBrand(D.org.brand); }
   if(!L){ $('title').textContent='Zakupy'; $('sub').textContent=`Cześć ${D.first_name||''}! Tomek nie opublikował jeszcze listy na ten tydzień.`; $('list').innerHTML=''; $('prog').textContent=''; $('footN').textContent='0/0'; return; }
   WEEK=L.week_key;
   $('title').textContent=`Zakupy ${fmtD(L.week_from)}–${fmtD(L.week_to)}`;

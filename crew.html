@@ -289,27 +289,15 @@ pre.txt{white-space:pre-wrap;font:inherit;margin:0;line-height:1.5}
   </div>
 </div>
 
+<script src="pmb-core.js"></script>
 <script>
-const SUPABASE_URL = 'https://zqpqjgxtefzojhjglppb.supabase.co';
-const SUPABASE_KEY = 'sb_publishable__bPrQF9K35vs8RbLdWBRXQ_VBVj2esQ';
-
-const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
 const token = qs.get('t'); const code = qs.get('e'); const mtoken = qs.get('m') || qs.get('w'); const whEv = qs.get('ev');
 let D = null;
 
-async function rpc(fn, args){
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {method:'POST',
-    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},
-    body: JSON.stringify(args)});
-  if(!r.ok) throw new Error(await r.text());
-  return r.json();
-}
-
 const DAYS=['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
 const MONTHS=['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'];
 function fmtDate(s){ const d=new Date(s+'T12:00:00'); return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; }
-function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function money(n){ return n==null?'—':Number(n).toLocaleString('pl-PL')+' zł'; }
 
 function seg(id, val){
@@ -327,7 +315,7 @@ function renderTerms(txt){
   return out;
 }
 let TERMS=null;
-async function loadTerms(){ if(TERMS) return TERMS; try { TERMS = await rpc('crew_terms',{}); } catch(e){ TERMS={terms:'',warehouse:'',recruit_open:true}; } return TERMS; }
+async function loadTerms(){ if(TERMS) return TERMS; try { TERMS = await rpc('crew_terms',{p_org:orgSlug()}); applyBrand(TERMS&&TERMS.org&&TERMS.org.brand); } catch(e){ TERMS={terms:'',warehouse:'',recruit_open:true}; } return TERMS; }
 
 async function recruitFlow(){
   const t = await loadTerms();
@@ -345,7 +333,7 @@ async function recruitFlow(){
     if(d.student==null) miss.push('status studenta'); if(!d.experience) miss.push('doświadczenie'); if(!$('r_accept').checked) miss.push('akceptacja warunków');
     const el=$('rErr'); if(miss.length){ el.classList.remove('hidden'); el.textContent='Uzupełnij: '+miss.join(', '); return; } el.classList.add('hidden');
     $('rBtn').disabled=true;
-    try { const r=await rpc('crew_register',{p_phone:ph,p_data:d});
+    try { const r=await rpc('crew_register',{p_org:orgSlug(),p_phone:ph,p_data:d});
       if(r.exists){ el.classList.remove('hidden'); el.style.color='var(--acc)'; el.textContent='Ten numer jest już w bazie PMB — nie musisz zgłaszać się ponownie.'; $('rBtn').disabled=false; return; }
       $('rDone').classList.remove('hidden'); $('rBtn').classList.add('hidden'); window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'}); }
     catch(e){ $('rBtn').disabled=false; el.classList.remove('hidden'); el.textContent=/closed/.test(e.message)?'Nabór zamknięty.':'Nie udało się wysłać. Spróbuj jeszcze raz.'; }
@@ -473,7 +461,7 @@ document.addEventListener('visibilitychange',()=>{ if(!document.hidden && D && D
 $('btnReopen').onclick = ()=>{ D.assignment.status='otwarty'; render(); };
 
 async function joinFlow(){
-  let info=null; try { info = await rpc('crew_invite_info',{p_code:code}); } catch(e){}
+  let info=null; try { info = await rpc('crew_invite_info',{p_code:code}); applyBrand(info&&info.org&&info.org.brand); } catch(e){}
   $('loading').classList.add('hidden');
   if(!info){ $('invalid').classList.remove('hidden'); return; }
   $('statusPill').textContent='Zapisy'; $('statusPill').className='pill warn';
@@ -507,7 +495,7 @@ function matchRecipes(txt, lib){
 let RCP_LIB=null;
 async function showRecipes(menuTxt){
   const box=$('agRecipes'); if(!menuTxt){ box.innerHTML=''; return; }
-  try{ if(!RCP_LIB) RCP_LIB=await rpc('crew_recipes',{}); }catch(e){ RCP_LIB=[]; }
+  try{ if(!RCP_LIB) RCP_LIB=await rpc('crew_recipes',{p_org:orgSlug()}); }catch(e){ RCP_LIB=[]; }
   const hits=matchRecipes(menuTxt, RCP_LIB||[]);
   if(!hits.length){ box.innerHTML=''; return; }
   box.innerHTML='<h2 style="margin-top:14px">Receptury — jak robimy</h2>'+hits.map(r=>`
@@ -520,7 +508,7 @@ async function showRecipes(menuTxt){
     </details>`).join('');
 }
 async function homeFlow(){
-  let H=null; try{ H=await rpc('crew_home',{p_mtoken:mtoken}); }catch(e){}
+  let H=null; try{ H=await rpc('crew_home',{p_mtoken:mtoken}); applyBrand(H&&H.org&&H.org.brand); }catch(e){}
   $('loading').classList.add('hidden');
   if(!H){ $('invalid').classList.remove('hidden'); return; }
   $('statusPill').textContent='Moje eventy'; $('statusPill').className='pill';
@@ -589,7 +577,7 @@ document.addEventListener('visibilitychange',()=>{ if(!document.hidden && WH){ w
   if(!token && qs.has('r')){ return recruitFlow(); }
   if(!token && code){ return joinFlow(); }
   if(!token){ $('loading').classList.add('hidden'); $('invalid').classList.remove('hidden'); return; }
-  try { D = await rpc('crew_get',{p_token:token}); } catch(e){ D=null; }
+  try { D = await rpc('crew_get',{p_token:token}); applyBrand(D&&D.org&&D.org.brand); } catch(e){ D=null; }
   $('loading').classList.add('hidden');
   if(!D){ $('invalid').classList.remove('hidden'); $('statusPill').textContent='—'; return; }
   $('app').classList.remove('hidden'); render();
