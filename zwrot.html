@@ -42,6 +42,10 @@ h2{font-family:'Bebas Neue',Inter,sans-serif;font-size:20px;letter-spacing:.05em
 .perish{background:rgba(232,176,75,.12);color:var(--acc);border-color:rgba(232,176,75,.3);cursor:default}
 .perish b{font-size:11px;letter-spacing:.08em;text-transform:uppercase}
 .item .nt{font-size:12px;color:var(--acc);margin-top:6px}
+.aware{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.aware button{background:var(--card2);border:1px solid var(--line);color:var(--muted);padding:7px 10px;border-radius:9px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.aware button.on{border-color:var(--ok);color:var(--ok);background:rgba(76,195,138,.12)}
+.aware button[data-aw="0"].on{border-color:var(--acc);color:var(--acc);background:rgba(232,176,75,.12)}
 .sticky{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center}
 .btn{border:0;border-radius:12px;padding:14px;font:inherit;font-size:16px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--txt);border:1px solid var(--line);flex:1}
 .btn.primary{background:var(--acc);color:#151004;border-color:var(--acc)}
@@ -120,9 +124,11 @@ function render(){
         <div class="u">${esc(i.unit||'')}</div>
       </div>
       ${i.perishable?`<div class="perish" data-perish="${esc(i.catalog_id)}"><b>Napoczęte wylewamy</b> · nie przywozimy otwartych — zamknięte wracają na stan</div>`:''}
+      ${Number(i.returned_qty)>0?`<div class="aware" data-aware="${esc(i.catalog_id)}"><span class="note">Organizator wie, że to wraca?</span><button type="button" class="${i.client_aware===true?'on':''}" data-aw="1" ${dis}>Wie — odliczamy od faktury</button><button type="button" class="${i.client_aware===false?'on':''}" data-aw="0" ${dis}>Nie wie — liczymy</button></div>`:''}
       ${i.note?`<div class="nt">💬 ${esc(i.note)}</div>`:''}
     </div>`).join('')}</div>`).join('') || '';
   $('list').querySelectorAll('[data-ret],[data-open]').forEach(inp=>inp.onchange=()=>save(inp.dataset.ret||inp.dataset.open, null));
+  $('list').querySelectorAll('[data-aware] button').forEach(b=>b.onclick=()=>{ const id=b.closest('[data-aware]').dataset.aware; const it=itemsAll().find(x=>x.catalog_id===id); if(it) it.client_aware=b.dataset.aw==='1'; save(id,null); });
 }
 async function save(id, note){
   if(closed()) return;
@@ -131,7 +137,7 @@ async function save(id, note){
   const ret=r&&r.value!==''?Number(r.value):(it.returned_qty??0), op=o&&o.value!==''?Number(o.value):(it.opened_qty??0);
   const nt=note!=null?note:(it.note||null);
   it.returned_qty=ret; it.opened_qty=op; it.note=nt; it.counted=true; render();   // optymistycznie
-  try{ D=await rpc('wh_return_set',{p_mtoken:W,p_event:EV,p_catalog:id,p_returned:ret,p_opened:op,p_note:nt}); render(); toast('Zapisano'); }
+  try{ D=await rpc('wh_return_set',{p_mtoken:W,p_event:EV,p_catalog:id,p_returned:ret,p_opened:op,p_note:nt,p_client_aware:it.client_aware==null?null:!!it.client_aware}); render(); toast('Zapisano'); }
   catch(e){ toast(/closed/.test(e.message)?'Zwrot już zamknięty':'Nie zapisało się — sprawdź internet'); load(); }
 }
 $('addBtn').onclick=()=>{ $('addPanel').classList.toggle('hidden'); $('addQ').focus(); renderAdd(); };

@@ -85,6 +85,31 @@ end $$;
 drop trigger if exists packing_items_issue on packing_items;
 create trigger packing_items_issue after update of packed_at on packing_items for each row execute function packing_items_issue();
 
+-- ===== B1. POZYCJE SPAKOWANE PRZED TĄ MIGRACJĄ =====
+-- Odhaczone wcześniej pozycje nie mają ruchu wydania. Dopisujemy go, żeby zwrot z eventu widział, co pojechało:
+--  - spakowane PO ostatnim remanencie pozycji → normalny ruch (stan spada, bo remanent liczył je jeszcze w magazynie),
+--  - spakowane PRZED remanentem → ruch bez zmiany stanu (remanent już ich nie widział). Idempotentne.
+do $$
+declare r record;
+begin
+  for r in
+    select p.id, p.org_id, p.catalog_id, p.qty_num, p.packed_at, c.stock_updated_at, (select first_name from crew where id = p.packed_by) as who
+    from packing_items p join catalog c on c.id = p.catalog_id
+    where p.packed_at is not null and p.qty_num is not null and c.stock is not null
+      and not exists (select 1 from stock_moves m where m.ref_type = 'packing_item' and m.ref_id = p.id)
+  loop
+    if r.stock_updated_at is null or r.packed_at > r.stock_updated_at then
+      insert into stock_moves (org_id, catalog_id, qty, kind, ref_type, ref_id, note, created_by, created_at)
+      values (r.org_id, r.catalog_id, -r.qty_num, 'event_wydanie', 'packing_item', r.id, 'uzupełnione przy update28 (spakowane po remanencie)', r.who, r.packed_at);
+    else
+      perform set_config('pmb.from_audit', '1', true);
+      insert into stock_moves (org_id, catalog_id, qty, kind, ref_type, ref_id, note, created_by, created_at)
+      values (r.org_id, r.catalog_id, -r.qty_num, 'event_wydanie', 'packing_item', r.id, 'uzupełnione przy update28 (spakowane przed remanentem — stan bez zmian)', r.who, r.packed_at);
+      perform set_config('pmb.from_audit', '', true);
+    end if;
+  end loop;
+end $$;
+
 -- ===== B2. ZAPAS (poza agendą) =====
 -- dodanie pozycji spoza agendy — od razu jako spakowana (wydanie ze stanu przez trigger) — i usunięcie
 create or replace function wh_reserve_add(p_mtoken text, p_event uuid, p_catalog uuid, p_qty numeric)
@@ -212,6 +237,7 @@ create table if not exists event_return_items (
   org_id uuid not null references orgs(id) default current_org_id(),
   returned_qty numeric not null default 0,   -- całe sztuki, które wróciły na stan
   opened_qty numeric not null default 0,     -- napoczęte (poza stanem)
+  client_aware boolean,                      -- czy organizator wie o zwrocie (true = odliczamy od faktury; false = nikt nie wie, liczymy; null = nie dotyczy)
   note text, updated_at timestamptz default now(), updated_by text,
   primary key (return_id, catalog_id)
 );
@@ -244,7 +270,7 @@ begin
       select coalesce(json_agg(json_build_object(
         'catalog_id', p.catalog_id, 'name', ct.name, 'category', ct.category, 'unit', ct.unit,
         'packed_qty', p.packed_qty, 'reserve_qty', coalesce(p.reserve_qty, 0), 'stock', ct.stock, 'perishable', ct.perishable,
-        'returned_qty', ri.returned_qty, 'opened_qty', ri.opened_qty, 'note', ri.note, 'counted', ri.catalog_id is not null
+        'returned_qty', ri.returned_qty, 'opened_qty', ri.opened_qty, 'client_aware', ri.client_aware, 'note', ri.note, 'counted', ri.catalog_id is not null
       ) order by (select coalesce(idx - 1, 999) from jsonb_array_elements_text(cat_order) with ordinality t(v, idx) where v = ct.category), ct.category, ct.name), '[]'::json)
       from (
         select m.catalog_id, sum(-m.qty) as packed_qty, sum(-m.qty) filter (where pi.reserve) as reserve_qty
@@ -264,7 +290,8 @@ begin
 end $$;
 
 -- wpis zwrotu jednej pozycji: delta całych sztuk → ruch event_powrot; napoczęte → catalog.opened_qty
-create or replace function wh_return_set(p_mtoken text, p_event uuid, p_catalog uuid, p_returned numeric, p_opened numeric, p_note text)
+drop function if exists wh_return_set(text, uuid, uuid, numeric, numeric, text);
+create or replace function wh_return_set(p_mtoken text, p_event uuid, p_catalog uuid, p_returned numeric, p_opened numeric, p_note text, p_client_aware boolean default null)
 returns json language plpgsql security definer set search_path = public as $$
 declare c crew; r event_returns; prev_ret numeric := 0; prev_open numeric := 0; d numeric;
 begin
@@ -279,9 +306,9 @@ begin
   if r.status = 'zamkniety' then raise exception 'closed'; end if;
   select returned_qty, opened_qty into prev_ret, prev_open from event_return_items where return_id = r.id and catalog_id = p_catalog;
   prev_ret := coalesce(prev_ret, 0); prev_open := coalesce(prev_open, 0);
-  insert into event_return_items (return_id, catalog_id, org_id, returned_qty, opened_qty, note, updated_at, updated_by)
-  values (r.id, p_catalog, c.org_id, coalesce(p_returned, 0), coalesce(p_opened, 0), nullif(trim(p_note), ''), now(), c.first_name)
-  on conflict (return_id, catalog_id) do update set returned_qty = excluded.returned_qty, opened_qty = excluded.opened_qty, note = excluded.note, updated_at = now(), updated_by = excluded.updated_by;
+  insert into event_return_items (return_id, catalog_id, org_id, returned_qty, opened_qty, client_aware, note, updated_at, updated_by)
+  values (r.id, p_catalog, c.org_id, coalesce(p_returned, 0), coalesce(p_opened, 0), p_client_aware, nullif(trim(p_note), ''), now(), c.first_name)
+  on conflict (return_id, catalog_id) do update set returned_qty = excluded.returned_qty, opened_qty = excluded.opened_qty, client_aware = excluded.client_aware, note = excluded.note, updated_at = now(), updated_by = excluded.updated_by;
   d := coalesce(p_returned, 0) - prev_ret;
   if d <> 0 then
     insert into stock_moves (org_id, catalog_id, qty, kind, ref_type, ref_id, note, created_by)
@@ -308,7 +335,7 @@ begin
   return wh_return_get(p_mtoken, p_event);
 end $$;
 
-grant execute on function wh_return_get(text, uuid), wh_return_set(text, uuid, uuid, numeric, numeric, text), wh_return_close(text, uuid, text) to anon, authenticated;
+grant execute on function wh_return_get(text, uuid), wh_return_set(text, uuid, uuid, numeric, numeric, text, boolean), wh_return_close(text, uuid, text) to anon, authenticated;
 
 -- wh_events: status zwrotu przy każdym evencie (do plakietki „do rozliczenia”); sygnatura bez zmian
 create or replace function wh_events(p_mtoken text)
@@ -336,6 +363,7 @@ select m.org_id, pi.event_id, c.id as catalog_id, c.name, c.category, c.unit,
        coalesce(sum(-m.qty) filter (where pi.reserve), 0) as reserve,
        coalesce(r.returned_qty, 0) as returned,
        coalesce(r.opened_qty, 0) as opened,
+       r.client_aware,
        sum(-m.qty) - coalesce(r.returned_qty, 0) as used
 from stock_moves m
 join packing_items pi on pi.id = m.ref_id and m.ref_type = 'packing_item'
@@ -343,7 +371,7 @@ join catalog c on c.id = m.catalog_id
 left join event_returns er on er.event_id = pi.event_id and er.org_id = m.org_id
 left join event_return_items r on r.return_id = er.id and r.catalog_id = c.id
 where m.kind = 'event_wydanie'
-group by m.org_id, pi.event_id, c.id, c.name, c.category, c.unit, r.returned_qty, r.opened_qty
+group by m.org_id, pi.event_id, c.id, c.name, c.category, c.unit, r.returned_qty, r.opened_qty, r.client_aware
 having sum(-m.qty) > 0;
 grant select on event_usage to authenticated;
 

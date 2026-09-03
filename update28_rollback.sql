@@ -10,7 +10,7 @@ drop function if exists catalog_stock_audit();
 drop function if exists stock_moves_apply();
 drop view if exists event_usage;
 drop function if exists wh_return_get(text, uuid);
-drop function if exists wh_return_set(text, uuid, uuid, numeric, numeric, text);
+drop function if exists wh_return_set(text, uuid, uuid, numeric, numeric, text, boolean);
 drop function if exists wh_return_close(text, uuid, text);
 drop function if exists wh_reserve_add(text, uuid, uuid, numeric);
 drop function if exists wh_reserve_remove(text, uuid, uuid);
