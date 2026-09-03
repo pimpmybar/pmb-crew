@@ -285,6 +285,9 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
                 <div><label>Barmanów</label><input id="e_bart" type="number"></div>
                 <div><label>Pomocników</label><input id="e_help" type="number"></div>
               </div>
+              <div class="grid g3">
+                <div><label>Stawka za brak szkła (zł/szt., puste = z ustawień organizacji)</label><input id="e_glass" type="number" step="0.01" placeholder="np. 14"></div>
+              </div>
               <label>Opis dla barmana (widoczny przed akceptacją)</label><textarea id="e_summary"></textarea>
               <h2 style="margin-top:18px">Link grupowy (jeden na grupę WhatsApp)</h2>
               <p class="muted" style="margin-top:0">Każdy, kto kliknie, podaje swój numer i dostaje osobisty link. Tworzy wpis TYLKO dla nowych numerów (stawka domyślna poniżej). Osoby dodane w Składzie dostają od Ciebie link osobisty — przez link grupowy zobaczą tylko „jesteś już na liście”.</p>
@@ -434,6 +437,17 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
         <label>Nazwa marki (logo na stronach)</label><input id="set_brand" style="width:280px">
         <label>Kolejność kategorii w zakupach (po przecinku)</label><input id="set_catOrder" style="width:100%">
         <label>Kategorie kupowane domyślnie (po przecinku)</label><input id="set_buyDefault" style="width:100%">
+        <h2 style="margin-top:16px">Zwrot z eventu</h2>
+        <p class="muted" style="margin-top:0">Jak ekipa liczy zwrot w każdej kategorii. Kategorie <b>z napoczętymi</b>: wpisują całe sztuki i osobno napoczęte. Kategorie <b>liczone brakami</b> (szkło, sprzęt): wpisują tylko braki, reszta wróciła. Pozostałe kategorie: tylko całe sztuki. Przy zamknięciu zwrotu pozycje bez wpisu dostają wartość domyślną: zużywalne = zużyte, liczone brakami = wróciło w całości.</p>
+        <div class="grid g2">
+          <div><label>Kategorie z napoczętymi (po przecinku)</label><input id="set_retOpen" style="width:100%"></div>
+          <div><label>Kategorie liczone brakami (po przecinku)</label><input id="set_retShort" style="width:100%"></div>
+        </div>
+        <div class="grid g2">
+          <div><label>Stawka za brak szkła (zł/szt.)</label><input id="set_glassPrice" type="number" step="0.01" style="width:120px"></div>
+          <div><label>Kategorie wyceniane tą stawką (po przecinku)</label><input id="set_glassCats" style="width:100%"></div>
+        </div>
+        <label>Podpowiedzi na ekranie zwrotu (jedna linia = KATEGORIA: tekst)</label><textarea id="set_retNotes" style="width:100%;min-height:120px"></textarea>
         <div style="margin-top:8px"><button class="btn primary" id="set_saveOrg">Zapisz organizację</button></div>
       </div>
       <div class="card">
@@ -600,7 +614,7 @@ async function openEvent(id){
   $('e_name').value=cur.name||''; $('e_client').value=cur.client||''; $('e_date').value=cur.event_date||''; $('e_end_date').value=cur.event_end_date||''; $('e_start').value=cur.start_time||''; $('e_end').value=cur.end_time||'';
   $('e_status').value=cur.status; $('e_venue').value=cur.venue||''; $('e_address').value=cur.address||''; $('e_map').value=cur.map_url||'';
   $('e_vurl').value=cur.venue_url||''; $('e_pay').value=cur.payment_info||''; $('e_travel').value=cur.travel_note||'';
-  $('e_drb').value=cur.default_rate_bartender??''; $('e_drh').value=cur.default_rate_helper??''; $('e_drn').value=cur.default_rate_note||''; $('e_open').checked=cur.invite_open!==false;
+  $('e_drb').value=cur.default_rate_bartender??''; $('e_glass').value=cur.glass_price??''; $('e_drh').value=cur.default_rate_helper??''; $('e_drn').value=cur.default_rate_note||''; $('e_open').checked=cur.invite_open!==false;
   const inv = cur.invite_code ? `${crewUrl()}?e=${cur.invite_code}` : '(zapisz event, żeby wygenerować)';
   $('e_invite').textContent=inv;
   $('e_invCopy').onclick=()=>{ navigator.clipboard.writeText(inv); toast('Link skopiowany'); };
@@ -629,7 +643,7 @@ $('newEvent').onclick = async()=>{
 $('e_save').onclick = async()=>{
   const n = v => v===''?null:Number(v);
   const body={name:$('e_name').value,client:$('e_client').value,event_date:$('e_date').value,event_end_date:$('e_end_date').value||null,start_time:$('e_start').value,end_time:$('e_end').value,status:$('e_status').value,
-    venue:$('e_venue').value,address:$('e_address').value,map_url:$('e_map').value,venue_url:$('e_vurl').value,payment_info:$('e_pay').value,travel_note:$('e_travel').value,default_rate_bartender:n($('e_drb').value),default_rate_helper:n($('e_drh').value),default_rate_note:$('e_drn').value,invite_open:$('e_open').checked,guests:n($('e_guests').value),bartenders_needed:n($('e_bart').value),helpers_needed:n($('e_help').value),summary:$('e_summary').value};
+    venue:$('e_venue').value,address:$('e_address').value,map_url:$('e_map').value,venue_url:$('e_vurl').value,payment_info:$('e_pay').value,travel_note:$('e_travel').value,default_rate_bartender:n($('e_drb').value),default_rate_helper:n($('e_drh').value),default_rate_note:$('e_drn').value,invite_open:$('e_open').checked,guests:n($('e_guests').value),bartenders_needed:n($('e_bart').value),helpers_needed:n($('e_help').value),summary:$('e_summary').value,glass_price:n($('e_glass').value)};
   await api('PATCH',`events?id=eq.${cur.id}`,body); toast('Zapisano'); await loadEvents(); openEvent(cur.id);
 };
 $('e_del').onclick = async()=>{ if(!confirm('Usunąć event razem z przypisaniami?')) return; await api('DELETE',`events?id=eq.${cur.id}`,null,'return=minimal'); cur=null; $('evPane').classList.add('hidden'); loadEvents(); };
@@ -757,10 +771,16 @@ async function loadUsage(){
   rb.onclick=async()=>{ if(!confirm('Otworzyć zwrot ponownie? Ekipa będzie mogła poprawić wpisy.')) return; await api('PATCH',`event_returns?id=eq.${ret.id}`,{status:'w_toku',closed_at:null,closed_by:null},'return=minimal'); loadUsage(); toast('Zwrot otwarty'); };
   if(!usage.length){ $('pk_usage').innerHTML='<p class="muted">Nic jeszcze nie wydano (żadna pozycja ze stanem nie jest odhaczona).</p>'; return; }
   const tu=usage.reduce((a,u)=>a+Number(u.used||0),0);
-  let cat=null, html='<table><thead><tr><th>Pozycja</th><th class="right">Wydano</th><th class="right" title="w tym zapas poza agendą">w tym zapas</th><th class="right">Wróciło</th><th class="right" title="napoczęte, poza stanem">Napoczęte</th><th class="right">Zużyto</th><th title="czy organizator wie o zwrocie">Organizator</th></tr></thead><tbody>';
-  usage.forEach(u=>{ if(u.category!==cat){ cat=u.category; html+=`<tr class="cat"><td colspan="7" style="color:var(--acc);font-weight:700;padding-top:10px">${esc(cat)}</td></tr>`; }
-    html+=`<tr><td>${esc(u.name)} <span class="muted">${esc(u.unit||'')}</span></td><td class="right">${fmtN(u.issued)}</td><td class="right muted">${Number(u.reserve)?fmtN(u.reserve):'·'}</td><td class="right">${fmtN(u.returned)}</td><td class="right muted">${Number(u.opened)?fmtN(u.opened):'·'}</td><td class="right"><b>${fmtN(u.used)}</b></td><td>${Number(u.returned)>0?(u.client_aware===true?'<span class="pill ok" style="font-size:10px">wie · od faktury</span>':u.client_aware===false?'<span class="pill warn" style="font-size:10px">nie wie · liczymy</span>':'<span class="muted">?</span>'):''}</td></tr>`; });
+  const hasShort=usage.some(u=>u.mode==='shortage'||Number(u.shortage)>0);
+  const glassQty=usage.reduce((a,u)=>a+(u.shortage_value!=null?Number(u.shortage||0):0),0), glassVal=usage.reduce((a,u)=>a+Number(u.shortage_value||0),0);
+  const rate=cur.glass_price??((ORG&&ORG.config&&ORG.config.glass_price)??null);
+  let cat=null, html='<table><thead><tr><th>Pozycja</th><th class="right">Wydano</th><th class="right" title="w tym zapas poza agendą">w tym zapas</th><th class="right">Wróciło</th><th class="right" title="napoczęte, poza stanem">Napoczęte</th>'+(hasShort?'<th class="right" title="braki wpisane przez ekipę (szkło, sprzęt)">Braki</th>':'')+'<th class="right">Zużyto</th><th title="czy organizator wie o zwrocie">Organizator</th></tr></thead><tbody>';
+  const cols=hasShort?8:7;
+  usage.forEach(u=>{ if(u.category!==cat){ cat=u.category; html+=`<tr class="cat"><td colspan="${cols}" style="color:var(--acc);font-weight:700;padding-top:10px">${esc(cat)}</td></tr>`; }
+    const sh=Number(u.shortage||0);
+    html+=`<tr><td>${esc(u.name)} <span class="muted">${esc(u.unit||'')}</span>${u.auto?' <span class="muted" title="wpis domyślny przy zamknięciu / zbiorczy" style="font-size:10px">domyślnie</span>':''}</td><td class="right">${fmtN(u.issued)}</td><td class="right muted">${Number(u.reserve)?fmtN(u.reserve):'·'}</td><td class="right">${fmtN(u.returned)}</td><td class="right muted">${Number(u.opened)?fmtN(u.opened):'·'}</td>${hasShort?`<td class="right" ${sh>0?'style="color:var(--bad);font-weight:700"':'class="right muted"'}>${sh>0?fmtN(sh)+(u.shortage_value!=null?` <span class="muted" style="font-weight:400">= ${fmtN(u.shortage_value)} zł</span>`:''):'·'}</td>`:''}<td class="right"><b>${fmtN(u.used)}</b></td><td>${(u.mode!=='shortage'&&Number(u.returned)>0)?(u.client_aware===true?'<span class="pill ok" style="font-size:10px">wie · od faktury</span>':u.client_aware===false?'<span class="pill warn" style="font-size:10px">nie wie · liczymy</span>':'<span class="muted">?</span>'):''}</td></tr>`; });
   html+=`</tbody></table><p class="muted" style="margin:8px 0 0">${usage.length} pozycji · zużyte łącznie ${fmtN(tu)} (różne jednostki)</p>`;
+  if(glassQty>0) html+=`<p id="pk_glass" style="margin:6px 0 0"><b>Braki szkła do rozliczenia z organizatorem: ${fmtN(glassQty)} szt. × ${fmtN(rate||0)} zł = ${fmtN(glassVal)} zł</b> <span class="muted">(stawka ${cur.glass_price!=null?'z eventu':'z ustawień organizacji'})</span></p>`;
   $('pk_usage').innerHTML=html;
 }
 $('pk_refresh').onclick=loadPack;
@@ -1215,12 +1235,18 @@ async function loadSettings(){
   $('set_stockCopy').onclick=()=>{ if(S.stock_key){ navigator.clipboard.writeText(stockLink); toast('Link skopiowany'); } };
   $('set_stockNew').onclick=async()=>{ if(!confirm('Wygenerować nowy link do remanentu? Stary przestanie działać.')) return; const k=[...crypto.getRandomValues(new Uint8Array(8))].map(b=>b.toString(16).padStart(2,'0')).join(''); await saveSetting('stock_key',k); toast('Nowy link gotowy'); loadSettings(); };
   $('set_recruitCopy').onclick=()=>{ navigator.clipboard.writeText(link); toast('Link skopiowany'); };
-  if(ORG){ const c=ORG.config||{}; $('set_brand').value=c.brand||ORG.name||''; $('set_catOrder').value=CAT_ORDER.join(', '); $('set_buyDefault').value=[...BUY_DEFAULT].join(', '); }
+  if(ORG){ const c=ORG.config||{}; $('set_brand').value=c.brand||ORG.name||''; $('set_catOrder').value=CAT_ORDER.join(', '); $('set_buyDefault').value=[...BUY_DEFAULT].join(', ');
+    const modes=c.return_modes||{}; $('set_retOpen').value=Object.keys(modes).filter(k=>modes[k]==='open').join(', '); $('set_retShort').value=Object.keys(modes).filter(k=>modes[k]==='shortage').join(', ');
+    $('set_glassPrice').value=c.glass_price??''; $('set_glassCats').value=(c.glass_categories||[]).join(', ');
+    $('set_retNotes').value=Object.entries(c.return_notes||{}).map(([k,v])=>`${k}: ${v}`).join('\n'); }
 }
 $('set_saveOrg').onclick=async()=>{
   if(!ORG){ toast('Brak organizacji — uruchom update27.sql w Supabase'); return; }
   const split=s=>s.split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
-  const config=Object.assign({},ORG.config||{},{brand:$('set_brand').value.trim(),cat_order:split($('set_catOrder').value),buy_default:split($('set_buyDefault').value)});
+  const modes={}; split($('set_retOpen').value).forEach(k=>modes[k]='open'); split($('set_retShort').value).forEach(k=>modes[k]='shortage'); CAT_ORDER.forEach(k=>{ if(!modes[k]) modes[k]='whole'; });
+  const notes={}; $('set_retNotes').value.split('\n').forEach(l=>{ const m=l.match(/^\s*([^:]+):\s*(.+)$/); if(m) notes[m[1].trim().toUpperCase()]=m[2].trim(); });
+  const gp=$('set_glassPrice').value===''?null:Number($('set_glassPrice').value);
+  const config=Object.assign({},ORG.config||{},{brand:$('set_brand').value.trim(),cat_order:split($('set_catOrder').value),buy_default:split($('set_buyDefault').value),return_modes:modes,return_notes:notes,glass_price:gp,glass_categories:split($('set_glassCats').value)});
   await api('PATCH',`orgs?id=eq.${ORG.id}`,{config},'return=minimal'); await loadOrg(); toast('Zapisano organizację');
 };
 async function saveSetting(key,value){ await api('POST','settings',{key,value,updated_at:new Date().toISOString()},'resolution=merge-duplicates,return=minimal'); }

@@ -46,6 +46,15 @@ h2{font-family:'Bebas Neue',Inter,sans-serif;font-size:20px;letter-spacing:.05em
 .aware button{background:var(--card2);border:1px solid var(--line);color:var(--muted);padding:7px 10px;border-radius:9px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
 .aware button.on{border-color:var(--ok);color:var(--ok);background:rgba(76,195,138,.12)}
 .aware button[data-aw="0"].on{border-color:var(--acc);color:var(--acc);background:rgba(232,176,75,.12)}
+.cath{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:18px 0 6px}
+.cath h2{margin:0}
+.cath .bulk{display:flex;gap:6px}
+.cath .bulk button{background:var(--card2);border:1px solid var(--line);color:var(--muted);padding:6px 9px;border-radius:9px;font:inherit;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap}
+.cath .bulk button:disabled{opacity:.4}
+.catnote{color:var(--muted);font-size:12px;line-height:1.4;margin:0 0 8px;padding:8px 10px;border-radius:10px;background:var(--card);border:1px dashed var(--line)}
+.item .calc{font-size:12px;color:var(--ok);padding-bottom:12px;white-space:nowrap}
+.item .calc.bad{color:var(--bad)}
+.tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:6px;background:var(--card2);color:var(--muted);margin-left:6px;vertical-align:middle}
 .sticky{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center}
 .btn{border:0;border-radius:12px;padding:14px;font:inherit;font-size:16px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--txt);border:1px solid var(--line);flex:1}
 .btn.primary{background:var(--acc);color:#151004;border-color:var(--acc)}
@@ -70,7 +79,7 @@ h2{font-family:'Bebas Neue',Inter,sans-serif;font-size:20px;letter-spacing:.05em
       </div>
       <div class="bar"><i id="barFill"></i></div>
       <p class="note" id="prog" style="margin-top:6px"></p>
-      <p class="note" style="margin-top:8px">Wpisz, ile <b>całych</b> sztuk wróciło do magazynu — to wraca na stan. Napoczęte butelki i otwarte opakowania wpisz osobno: nie liczą się do stanu, ale magazyn widzi, że są do zużycia w pierwszej kolejności.</p>
+      <p class="note" style="margin-top:8px">Wpisujesz tylko to, co trzeba: <b>całe sztuki</b>, które wróciły (wracają na stan), a przy szkle i sprzęcie tylko <b>braki</b>. Nie musisz wypełniać wszystkiego — przy zamknięciu pozycje bez wpisu dostaną wartość domyślną: zużywalne = zużyte, szkło i sprzęt = wróciło w całości. Przyciskami przy kategorii załatwisz całą kategorię jednym ruchem.</p>
     </div>
     <div id="list"></div>
     <div class="card" id="addBox" style="margin-top:12px">
@@ -102,6 +111,9 @@ function itemsAll(){
   const ids=new Set(D.items.map(i=>i.catalog_id));
   return [...D.items, ...EXTRA.filter(x=>!ids.has(x.catalog_id))];
 }
+const MODES=()=>(D.org&&D.org.return_modes)||{}; const NOTES=()=>(D.org&&D.org.return_notes)||{}; const GLASS=()=>(D.org&&D.org.glass_categories)||['SZKŁO'];
+const modeOf=i=>{ const m=i.mode||MODES()[i.category]||'open'; return (m==='shortage'&&!(Number(i.packed_qty)>0))?'whole':m; };   // pozycja spoza listy nie ma z czego liczyć braków
+const glassRate=()=>Number(D.event&&D.event.glass_price)||0;
 function render(){
   const e=D.event; const items=itemsAll();
   $('title').textContent='Zwrot: '+e.name;
@@ -114,30 +126,48 @@ function render(){
   else { st.className='pill warn'; st.textContent=D.return?'w toku':'nowy'; $('closeBtn').textContent='✔ Zamknij zwrot'; $('closeBtn').disabled=false; $('addBox').classList.remove('hidden'); }
   const cats=[...new Set(items.map(i=>i.category))].sort((a,b)=>catIdx(a)-catIdx(b)||a.localeCompare(b,'pl'));
   const dis=closed()?'disabled':'';
-  $('list').innerHTML=cats.map(cat=>`<h2>${esc(cat)}</h2><div class="card">${items.filter(i=>i.category===cat).map(i=>`
-    <div class="item ${i.counted?'counted':''}" data-cat="${esc(i.catalog_id)}">
-      <div class="nm">${esc(i.name)}</div>
+  $('list').innerHTML=cats.map(cat=>{ const its=items.filter(i=>i.category===cat); const catMode=MODES()[cat]||'open'; const note=NOTES()[cat]; const packedAny=its.some(i=>Number(i.packed_qty)>0);
+    return `<div class="cath"><h2>${esc(cat)}</h2>${packedAny?`<div class="bulk"><button type="button" data-bulk="${esc(cat)}" data-what="all" ${dis}>✔ ${catMode==='shortage'?'Bez braków':'Wszystko wróciło'}</button>${catMode==='shortage'?'':`<button type="button" data-bulk="${esc(cat)}" data-what="none" ${dis}>Nic nie wróciło</button>`}</div>`:''}</div>
+    ${note?`<p class="catnote">${esc(note)}</p>`:''}
+    <div class="card">${its.map(i=>{ const m=modeOf(i); const isGlass=m==='shortage'&&GLASS().includes(i.category); const sh=Number(i.shortage_qty||0); const retCalc=Math.max(0,Number(i.packed_qty)-sh);
+    return `
+    <div class="item ${i.counted?'counted':''}" data-cat="${esc(i.catalog_id)}" data-mode="${m}">
+      <div class="nm">${esc(i.name)}${i.auto?'<span class="tag" title="wpis domyślny / zbiorczy">domyślnie</span>':''}</div>
       <div class="pk">${i.packed_qty>0?`spakowano ${fmtN(i.packed_qty)} ${esc(i.unit||'')}${Number(i.reserve_qty)?` (w tym zapas ${fmtN(i.reserve_qty)})`:''}`:'spoza listy'}${i.stock!=null?` · na stanie ${fmtN(i.stock)}`:''}</div>
-      <div class="row">
+      ${m==='shortage'?`<div class="row">
+        <div class="f"><label>Braki (nie wróciło)</label><input type="number" inputmode="decimal" step="any" min="0" max="${esc(i.packed_qty)}" data-short="${esc(i.catalog_id)}" value="${i.counted?sh:''}" ${dis}></div>
+        <div class="calc ${sh>0?'bad':''}">${i.counted?`wróciło ${fmtN(i.returned_qty)} ${esc(i.unit||'')}${isGlass&&sh>0&&glassRate()?`<br>${fmtN(sh)} × ${fmtN(glassRate())} zł = <b>${fmtN(sh*glassRate())} zł</b>`:''}`:`bez wpisu = wróciło ${fmtN(i.packed_qty)}`}</div>
+      </div>`:`<div class="row">
         <div class="f"><label>Wróciło (całe${i.perishable?', zamknięte':''})</label><input type="number" inputmode="decimal" step="any" min="0" data-ret="${esc(i.catalog_id)}" value="${i.returned_qty??''}" ${dis}></div>
-        ${i.perishable?'':`<div class="f"><label>Napoczęte</label><input type="number" inputmode="decimal" step="any" min="0" data-open="${esc(i.catalog_id)}" value="${i.opened_qty??''}" ${dis}></div>`}
+        ${(m==='open'&&!i.perishable)?`<div class="f"><label>Napoczęte</label><input type="number" inputmode="decimal" step="any" min="0" data-open="${esc(i.catalog_id)}" value="${i.opened_qty??''}" ${dis}></div>`:''}
         <div class="u">${esc(i.unit||'')}</div>
-      </div>
+      </div>`}
       ${i.perishable?`<div class="perish" data-perish="${esc(i.catalog_id)}"><b>Napoczęte wylewamy</b> · nie przywozimy otwartych — zamknięte wracają na stan</div>`:''}
-      ${Number(i.returned_qty)>0?`<div class="aware" data-aware="${esc(i.catalog_id)}"><span class="note">Organizator wie, że to wraca?</span><button type="button" class="${i.client_aware===true?'on':''}" data-aw="1" ${dis}>Wie — odliczamy od faktury</button><button type="button" class="${i.client_aware===false?'on':''}" data-aw="0" ${dis}>Nie wie — liczymy</button></div>`:''}
+      ${(m!=='shortage'&&Number(i.returned_qty)>0)?`<div class="aware" data-aware="${esc(i.catalog_id)}"><span class="note">Organizator wie, że to wraca?</span><button type="button" class="${i.client_aware===true?'on':''}" data-aw="1" ${dis}>Wie — odliczamy od faktury</button><button type="button" class="${i.client_aware===false?'on':''}" data-aw="0" ${dis}>Nie wie — liczymy</button></div>`:''}
       ${i.note?`<div class="nt">💬 ${esc(i.note)}</div>`:''}
-    </div>`).join('')}</div>`).join('') || '';
-  $('list').querySelectorAll('[data-ret],[data-open]').forEach(inp=>inp.onchange=()=>save(inp.dataset.ret||inp.dataset.open, null));
+    </div>`;}).join('')}</div>`; }).join('') || '';
+  $('list').querySelectorAll('[data-ret],[data-open],[data-short]').forEach(inp=>inp.onchange=()=>save(inp.dataset.ret||inp.dataset.open||inp.dataset.short, null));
   $('list').querySelectorAll('[data-aware] button').forEach(b=>b.onclick=()=>{ const id=b.closest('[data-aware]').dataset.aware; const it=itemsAll().find(x=>x.catalog_id===id); if(it) it.client_aware=b.dataset.aw==='1'; save(id,null); });
+  $('list').querySelectorAll('[data-bulk]').forEach(b=>b.onclick=()=>bulk(b.dataset.bulk,b.dataset.what));
 }
 async function save(id, note){
   if(closed()) return;
   const it=itemsAll().find(x=>x.catalog_id===id); if(!it) return;
-  const r=$('list').querySelector(`[data-ret="${id}"]`), o=$('list').querySelector(`[data-open="${id}"]`);
-  const ret=r&&r.value!==''?Number(r.value):(it.returned_qty??0), op=o&&o.value!==''?Number(o.value):(it.opened_qty??0);
+  const m=modeOf(it);
+  const r=$('list').querySelector(`[data-ret="${id}"]`), o=$('list').querySelector(`[data-open="${id}"]`), sI=$('list').querySelector(`[data-short="${id}"]`);
+  let ret, op=0, sh=null;
+  if(m==='shortage'){ sh=sI&&sI.value!==''?Math.min(Number(sI.value),Number(it.packed_qty)):Number(it.shortage_qty||0); ret=Math.max(0,Number(it.packed_qty)-sh); }
+  else { ret=r&&r.value!==''?Number(r.value):(it.returned_qty??0); op=o&&o.value!==''?Number(o.value):(m==='open'?(it.opened_qty??0):0); }
   const nt=note!=null?note:(it.note||null);
-  it.returned_qty=ret; it.opened_qty=op; it.note=nt; it.counted=true; render();   // optymistycznie
-  try{ D=await rpc('wh_return_set',{p_mtoken:W,p_event:EV,p_catalog:id,p_returned:ret,p_opened:op,p_note:nt,p_client_aware:it.client_aware==null?null:!!it.client_aware}); render(); toast('Zapisano'); }
+  it.returned_qty=ret; it.opened_qty=op; it.shortage_qty=sh||0; it.note=nt; it.counted=true; it.auto=false; render();   // optymistycznie
+  try{ D=await rpc('wh_return_set',{p_mtoken:W,p_event:EV,p_catalog:id,p_returned:ret,p_opened:op,p_note:nt,p_client_aware:it.client_aware==null?null:!!it.client_aware,p_shortage:sh}); render(); toast('Zapisano'); }
+  catch(e){ toast(/closed/.test(e.message)?'Zwrot już zamknięty':'Nie zapisało się — sprawdź internet'); load(); }
+}
+async function bulk(cat, what){
+  if(closed()) return;
+  const n=itemsAll().filter(i=>i.category===cat&&Number(i.packed_qty)>0).length;
+  if(!confirm(what==='all'?`${cat}: zaznaczyć, że wszystkie ${n} pozycje wróciły w całości (bez braków)?`:`${cat}: zaznaczyć, że nic z ${n} pozycji nie wróciło (wszystko zużyte)?`)) return;
+  try{ D=await rpc('wh_return_bulk',{p_mtoken:W,p_event:EV,p_category:cat,p_what:what}); render(); toast('Zapisano całą kategorię'); }
   catch(e){ toast(/closed/.test(e.message)?'Zwrot już zamknięty':'Nie zapisało się — sprawdź internet'); load(); }
 }
 $('addBtn').onclick=()=>{ $('addPanel').classList.toggle('hidden'); $('addQ').focus(); renderAdd(); };
@@ -146,12 +176,17 @@ function renderAdd(){
   const q=$('addQ').value.trim().toLowerCase(); const have=new Set(itemsAll().map(i=>i.catalog_id));
   const list=(D.extras||[]).filter(x=>!have.has(x.catalog_id)&&(!q||x.name.toLowerCase().includes(q)||x.category.toLowerCase().includes(q))).slice(0,12);
   $('addList').innerHTML=list.map(x=>`<div data-extra="${esc(x.catalog_id)}"><b>${esc(x.name)}</b> <span class="note">${esc(x.category)} · na stanie ${fmtN(x.stock)} ${esc(x.unit||'')}</span></div>`).join('')||'<p class="note">Brak pozycji.</p>';
-  $('addList').querySelectorAll('[data-extra]').forEach(el=>el.onclick=()=>{ const x=D.extras.find(y=>y.catalog_id===el.dataset.extra); EXTRA.push({...x,packed_qty:0,reserve_qty:0,perishable:!!x.perishable,returned_qty:null,opened_qty:null,note:null,counted:false}); $('addPanel').classList.add('hidden'); $('addQ').value=''; render(); const inp=$('list').querySelector(`[data-ret="${x.catalog_id}"]`); if(inp) inp.focus(); });
+  $('addList').querySelectorAll('[data-extra]').forEach(el=>el.onclick=()=>{ const x=D.extras.find(y=>y.catalog_id===el.dataset.extra); EXTRA.push({...x,packed_qty:0,reserve_qty:0,perishable:!!x.perishable,returned_qty:null,opened_qty:null,shortage_qty:0,note:null,counted:false}); $('addPanel').classList.add('hidden'); $('addQ').value=''; render(); const inp=$('list').querySelector(`[data-ret="${x.catalog_id}"]`); if(inp) inp.focus(); });
 }
 $('closeBtn').onclick=async()=>{
   if(closed()) return;
-  const items=itemsAll(); const left=items.filter(i=>!i.counted).length;
-  const note=prompt(left?`${left} pozycji bez wpisu — zostaną policzone jako zużyte w całości. Notatka do zwrotu (opcjonalnie):`:'Notatka do zwrotu (opcjonalnie):',''); if(note===null) return;
+  const items=itemsAll(); const left=items.filter(i=>!i.counted&&Number(i.packed_qty)>0);
+  const used=left.filter(i=>modeOf(i)!=='shortage'), back=left.filter(i=>modeOf(i)==='shortage');
+  const byCat=arr=>Object.entries(arr.reduce((a,i)=>(a[i.category]=(a[i.category]||0)+1,a),{})).map(([c,n])=>`${c} ${n}`).join(', ');
+  let msg='';
+  if(used.length) msg+=`ZUŻYTE (bez wpisu): ${byCat(used)}\n`;
+  if(back.length) msg+=`WRÓCIŁO W CAŁOŚCI (bez wpisu): ${byCat(back)}\n`;
+  const note=prompt((msg?msg+'\n':'')+'Notatka do zwrotu (opcjonalnie):',''); if(note===null) return;
   try{ D=await rpc('wh_return_close',{p_mtoken:W,p_event:EV,p_note:note}); render(); toast('Zwrot zamknięty'); }
   catch(e){ toast('Nie udało się zamknąć — spróbuj jeszcze raz'); }
 };
