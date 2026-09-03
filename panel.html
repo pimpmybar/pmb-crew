@@ -220,6 +220,14 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
               <div class="stat" id="pk_stat" style="margin-top:10px"></div>
               <div id="pk_list"></div>
             </div>
+            <div class="card" id="pk_usageCard">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                <h2 style="margin:0">Rozliczenie eventu — co pojechało, co wróciło</h2>
+                <div style="display:flex;gap:6px;align-items:center"><span class="muted" id="pk_retStatus"></span><button class="btn sm hidden" id="pk_reopen">Otwórz ponownie zwrot</button></div>
+              </div>
+              <p class="muted" style="margin-top:6px">Wydano = odhaczone w pakowaniu (stan spada w tej chwili). Wróciło = wpisane przez ekipę w zwrocie z eventu (link „Zwrot z eventu” w widoku magazynowym). Zużyto = różnica.</p>
+              <div id="pk_usage"></div>
+            </div>
             <div class="card">
               <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
                 <h2 style="margin:0">Ilości na ten event (agenda PMB)</h2>
@@ -704,7 +712,8 @@ async function loadCatalog(){ CAT = await api('GET','catalog?select=*&active=eq.
 function renderGrid(){
   const q=$('q_search').value.toLowerCase(), only=$('q_onlyFilled').checked;
   const byCat={}; CAT.forEach(c=>{ const it=PK.find(p=>p.catalog_id===c.id); if(only && !(it&&(it.qty_num!=null||it.note))) return; if(q && !c.name.toLowerCase().includes(q)) return; (byCat[c.category]=byCat[c.category]||[]).push({c,it}); });
-  $('q_grid').innerHTML = Object.keys(byCat).map(cat=>`<h2 style="margin:14px 0 4px;color:var(--acc)">${esc(cat)}</h2><table><thead><tr><th>Pozycja</th><th style="width:70px">Jedn.</th><th style="width:110px">Ilość</th><th style="width:140px">Uwagi</th><th style="width:80px" class="right">Stan</th></tr></thead><tbody>${byCat[cat].map(({c,it})=>`<tr><td>${esc(c.name)}</td><td class="muted">${esc(c.unit||'')}</td><td><input type="number" step="any" data-q="${c.id}" value="${it&&it.qty_num!=null?it.qty_num:''}" style="padding:5px 8px"></td><td><input data-n="${c.id}" value="${esc(it&&it.note||'')}" placeholder="KOSZ / KLIENT" style="padding:5px 8px"></td><td class="right muted">${fmtN(c.stock)}</td></tr>`).join('')}</tbody></table>`).join('') || '<p class="muted">Brak pozycji.</p>';
+  const packedWarn=it=>it&&it.packed_at&&it.qty_num!=null?` <span data-packedwarn="${esc(it.id)}" class="pill warn" style="font-size:10px" title="Pozycja jest już odhaczona jako spakowana — stan zszedł o poprzednią ilość. Po zmianie ilości odznacz ją i zaznacz ponownie w Pakowaniu, żeby stan się zgadzał.">spakowane</span>`:'';
+  $('q_grid').innerHTML = Object.keys(byCat).map(cat=>`<h2 style="margin:14px 0 4px;color:var(--acc)">${esc(cat)}</h2><table><thead><tr><th>Pozycja</th><th style="width:70px">Jedn.</th><th style="width:110px">Ilość</th><th style="width:140px">Uwagi</th><th style="width:80px" class="right">Stan</th></tr></thead><tbody>${byCat[cat].map(({c,it})=>`<tr><td>${esc(c.name)}${packedWarn(it)}</td><td class="muted">${esc(c.unit||'')}</td><td><input type="number" step="any" data-q="${c.id}" value="${it&&it.qty_num!=null?it.qty_num:''}" style="padding:5px 8px"></td><td><input data-n="${c.id}" value="${esc(it&&it.note||'')}" placeholder="KOSZ / KLIENT" style="padding:5px 8px"></td><td class="right muted">${fmtN(c.stock)}</td></tr>`).join('')}</tbody></table>`).join('') || '<p class="muted">Brak pozycji.</p>';
   const save = async(id)=>{ const c=CAT.find(x=>x.id===id); const qv=$('q_grid').querySelector(`[data-q="${id}"]`).value, nv=$('q_grid').querySelector(`[data-n="${id}"]`).value.trim();
     const it=PK.find(p=>p.catalog_id===id);
     if(it && it.event_id && it.event_id!==cur.id){ toast('Lista była nieaktualna — odświeżam, wpisz jeszcze raz'); await loadPack(); return; }
@@ -731,10 +740,28 @@ async function loadPack(){
   $('pk_stat').innerHTML = `<div><b>${done}/${PK.length}</b>zapakowane</div><div><b>${PK.length-done}</b>zostało</div>`;
   const PKV=PK.filter(p=>p.qty_num!=null||p.qty||p.note);
   const cats=[...new Set(PKV.map(p=>p.category))];
-  $('pk_list').innerHTML = cats.map(c=>`<h2 style="margin:14px 0 4px;color:var(--acc)">${esc(c)}</h2><table>${PKV.filter(p=>p.category===c).map(p=>`<tr><td style="width:28px"><input type="checkbox" data-pk="${p.id}" ${p.packed_at?'checked':''}></td><td ${p.packed_at?'class="muted"':''}>${esc(p.name)}</td><td class="mono" style="width:110px">${esc(p.qty||(p.qty_num!=null?fmtN(p.qty_num)+' '+(p.unit||''):''))}${p.note?' · '+esc(p.note):''}</td><td class="muted" style="width:160px">${p.packed_at?esc((p.crew||{}).first_name||'')+' · '+new Date(p.packed_at).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}):''}</td><td class="right" style="width:70px"><button class="btn sm" data-pke="${p.id}">✎</button> <button class="btn sm danger" data-pkd="${p.id}">✕</button></td></tr>`).join('')}</table>`).join('') || '<p class="muted">Lista pusta — dodaj pozycje poniżej.</p>';
+  $('pk_list').innerHTML = cats.map(c=>`<h2 style="margin:14px 0 4px;color:var(--acc)">${esc(c)}</h2><table>${PKV.filter(p=>p.category===c).map(p=>`<tr><td style="width:28px"><input type="checkbox" data-pk="${p.id}" ${p.packed_at?'checked':''}></td><td ${p.packed_at?'class="muted"':''}>${esc(p.name)}${p.reserve?' <span class="pill warn" style="font-size:10px">zapas</span>':''}</td><td class="mono" style="width:110px">${esc(p.qty||(p.qty_num!=null?fmtN(p.qty_num)+' '+(p.unit||''):''))}${p.note?' · '+esc(p.note):''}</td><td class="muted" style="width:160px">${p.packed_at?esc((p.crew||{}).first_name||'')+' · '+new Date(p.packed_at).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}):''}</td><td class="right" style="width:70px"><button class="btn sm" data-pke="${p.id}">✎</button> <button class="btn sm danger" data-pkd="${p.id}">✕</button></td></tr>`).join('')}</table>`).join('') || '<p class="muted">Lista pusta — dodaj pozycje poniżej.</p>';
   $('pk_list').querySelectorAll('[data-pk]').forEach(cb=>cb.onchange=async()=>{ await api('PATCH',`packing_items?id=eq.${cb.dataset.pk}`,{packed_at:cb.checked?new Date().toISOString():null,packed_by:null}); loadPack(); });
   $('pk_list').querySelectorAll('[data-pkd]').forEach(b=>b.onclick=async()=>{ await api('DELETE',`packing_items?id=eq.${b.dataset.pkd}`,null,'return=minimal'); loadPack(); });
   $('pk_list').querySelectorAll('[data-pke]').forEach(b=>b.onclick=async()=>{ const it=PK.find(p=>p.id===b.dataset.pke); const name=prompt('Nazwa:',it.name); if(name===null) return; const qty=prompt('Ilość:',it.qty||''); if(qty===null) return; await api('PATCH',`packing_items?id=eq.${it.id}`,{name,qty}); loadPack(); });
+  loadUsage();
+}
+async function loadUsage(){
+  let usage=[], ret=null;
+  try{ usage=await apiGet(`event_usage?event_id=eq.${cur.id}&order=category,name`); [ret]=await apiGet(`event_returns?event_id=eq.${cur.id}&select=*`); }catch(e){ $('pk_usageCard').classList.add('hidden'); return; }  // brak update28
+  $('pk_usageCard').classList.remove('hidden');
+  const st=$('pk_retStatus'), rb=$('pk_reopen');
+  if(!ret){ st.textContent='zwrot: jeszcze nie zaczęty'; rb.classList.add('hidden'); }
+  else if(ret.status==='zamkniety'){ st.innerHTML=`<span class="pill ok">zwrot zamknięty</span> ${esc(ret.closed_by||'')} ${ret.closed_at?new Date(ret.closed_at).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):''}${ret.note?' · '+esc(ret.note):''}`; rb.classList.remove('hidden'); }
+  else { st.innerHTML='<span class="pill warn">zwrot w toku</span>'; rb.classList.add('hidden'); }
+  rb.onclick=async()=>{ if(!confirm('Otworzyć zwrot ponownie? Ekipa będzie mogła poprawić wpisy.')) return; await api('PATCH',`event_returns?id=eq.${ret.id}`,{status:'w_toku',closed_at:null,closed_by:null},'return=minimal'); loadUsage(); toast('Zwrot otwarty'); };
+  if(!usage.length){ $('pk_usage').innerHTML='<p class="muted">Nic jeszcze nie wydano (żadna pozycja ze stanem nie jest odhaczona).</p>'; return; }
+  const tu=usage.reduce((a,u)=>a+Number(u.used||0),0);
+  let cat=null, html='<table><thead><tr><th>Pozycja</th><th class="right">Wydano</th><th class="right" title="w tym zapas poza agendą">w tym zapas</th><th class="right">Wróciło</th><th class="right" title="napoczęte, poza stanem">Napoczęte</th><th class="right">Zużyto</th></tr></thead><tbody>';
+  usage.forEach(u=>{ if(u.category!==cat){ cat=u.category; html+=`<tr class="cat"><td colspan="6" style="color:var(--acc);font-weight:700;padding-top:10px">${esc(cat)}</td></tr>`; }
+    html+=`<tr><td>${esc(u.name)} <span class="muted">${esc(u.unit||'')}</span></td><td class="right">${fmtN(u.issued)}</td><td class="right muted">${Number(u.reserve)?fmtN(u.reserve):'·'}</td><td class="right">${fmtN(u.returned)}</td><td class="right muted">${Number(u.opened)?fmtN(u.opened):'·'}</td><td class="right"><b>${fmtN(u.used)}</b></td></tr>`; });
+  html+=`</tbody></table><p class="muted" style="margin:8px 0 0">${usage.length} pozycji · zużyte łącznie ${fmtN(tu)} (różne jednostki)</p>`;
+  $('pk_usage').innerHTML=html;
 }
 $('pk_refresh').onclick=loadPack;
 $('pk_reset').onclick=async()=>{ if(!confirm('Odznaczyć wszystko?')) return; await api('PATCH',`packing_items?event_id=eq.${cur.id}`,{packed_at:null,packed_by:null}); loadPack(); };
@@ -923,8 +950,8 @@ function renderShop(){
     const chk=SHOP.checks&&SHOP.checks[r.c.id]; const chkTag=chk?` <span class="pill ok" style="font-size:10px" title="Odhaczone z telefonu">🛒 ${esc(chk.checked_by||'')} ${new Date(chk.checked_at).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})}</span>`:'';
     const xTag=xtra?` <span class="pill warn" style="font-size:10px">dokupienie</span> <button class="btn sm" data-xdel="${r.c.id}" title="Usuń z listy dokupień" style="padding:1px 6px;font-size:11px">✕</button>`:'';
     const tog=`<button class="btn sm" data-buyitem="${r.c.id}" title="${buy?'Wyłącz tę pozycję z zakupów (zostaje w pakowaniu)':'Włącz tę pozycję do zakupów'}" style="padding:1px 6px;font-size:11px;margin-left:6px;opacity:.7">${buy?'🛒':'✕'}</button>`;
-    if(!buy){ html+=`<tr style="opacity:.55"><td>${esc(r.c.name)}${tog}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="ev">${v?fmtN(v):'<span class="muted">·</span>'}</td>`).join('')}<td class="sum"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right"></td><td class="right muted" style="font-size:12px">nie kupujemy</td><td></td></tr>`; return; }
-    html+=`<tr${chk?' style="opacity:.75"':''}><td>${esc(r.c.name)}${effGroup(r.c)?` <span class="muted" style="font-size:11px">⇄ ${esc(effGroup(r.c))}</span>`:''}${xtra?xTag:tog}${chkTag}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="ev">${v?fmtN(v):'<span class="muted">·</span>'}</td>`).join('')}<td class="sum"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right"></td><td class="right"><input type="number" step="any" data-oq="${r.c.id}" value="${ov?n.q:(r.order>0?r.order:'')}" placeholder="${r.order>0?'':'—'}" title="${xtra?'Dokupienie poza agendami':ov?'Nadpisane ręcznie (wyliczone: '+fmtN(r.order)+')':'Wyliczone automatycznie'}" style="padding:4px 6px;width:80px;text-align:right;font-weight:700;color:${oq>0?'var(--acc)':'var(--muted)'};${ov?'border-color:var(--acc)':''}">${ov&&!xtra?`<div class="muted" style="font-size:10px">wyl. ${fmtN(r.order)}</div>`:''}</td><td><input data-oc="${r.c.id}" value="${esc(n.c||'')}" placeholder="np. sklep / kto kupuje" style="padding:4px 6px;width:100%"></td></tr>`;
+    if(!buy){ html+=`<tr style="opacity:.55"><td>${esc(r.c.name)}${tog}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="ev">${v?fmtN(v):'<span class="muted">·</span>'}</td>`).join('')}<td class="sum"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right">${Number(r.c.opened_qty)?`<div class="muted" style="font-size:11px;white-space:nowrap" title="napoczęte opakowania — poza stanem, zużyć najpierw">+ ${fmtN(r.c.opened_qty)} napoczęte</div>`:''}</td><td class="right muted" style="font-size:12px">nie kupujemy</td><td></td></tr>`; return; }
+    html+=`<tr${chk?' style="opacity:.75"':''}><td>${esc(r.c.name)}${effGroup(r.c)?` <span class="muted" style="font-size:11px">⇄ ${esc(effGroup(r.c))}</span>`:''}${xtra?xTag:tog}${chkTag}</td><td class="muted">${esc(r.c.unit||'')}</td>${r.per.map(v=>`<td class="ev">${v?fmtN(v):'<span class="muted">·</span>'}</td>`).join('')}<td class="sum"><b>${fmtN(r.need)}</b></td><td class="right"><input type="number" step="any" data-stock="${r.c.id}" value="${r.c.stock??''}" style="padding:4px 6px;width:80px;text-align:right">${Number(r.c.opened_qty)?`<div class="muted" style="font-size:11px;white-space:nowrap" title="napoczęte opakowania — poza stanem, zużyć najpierw">+ ${fmtN(r.c.opened_qty)} napoczęte</div>`:''}</td><td class="right"><input type="number" step="any" data-oq="${r.c.id}" value="${ov?n.q:(r.order>0?r.order:'')}" placeholder="${r.order>0?'':'—'}" title="${xtra?'Dokupienie poza agendami':ov?'Nadpisane ręcznie (wyliczone: '+fmtN(r.order)+')':'Wyliczone automatycznie'}" style="padding:4px 6px;width:80px;text-align:right;font-weight:700;color:${oq>0?'var(--acc)':'var(--muted)'};${ov?'border-color:var(--acc)':''}">${ov&&!xtra?`<div class="muted" style="font-size:10px">wyl. ${fmtN(r.order)}</div>`:''}</td><td><input data-oc="${r.c.id}" value="${esc(n.c||'')}" placeholder="np. sklep / kto kupuje" style="padding:4px 6px;width:100%"></td></tr>`;
     if(r.order>0) html+=groupHint(r,NCOL); });
   html+='</tbody></table>';
   // pozycje potrzebne, ale w całości pokryte ze stanu — żeby nie wyglądało, że „zniknęły”
@@ -1084,7 +1111,7 @@ async function renderMag(){
     return true;
   });
   const catOpts=[...new Set(CAT.map(c=>c.category))];
-  $('m_table').innerHTML = rows.length? `<table><thead><tr><th style="width:44px"></th><th style="width:150px">Kategoria</th><th>Nazwa</th><th style="width:110px" title="Grupa zamienników — np. WÓDKA. Pozycje z tą samą grupą podpowiadają się w Zakupach jako zamienniki.">Grupa ⇄</th><th style="width:70px" class="right" title="Cena zakupu za jednostkę (orientacyjna, zł)">Cena</th><th style="width:60px">Jedn.</th><th style="width:75px" class="right">Stan</th><th style="width:140px">Kto · kiedy</th><th style="width:180px" class="right">Akcje</th></tr></thead><tbody>${rows.map(c=>`
+  $('m_table').innerHTML = rows.length? `<table><thead><tr><th style="width:44px"></th><th style="width:150px">Kategoria</th><th>Nazwa</th><th style="width:110px" title="Grupa zamienników — np. WÓDKA. Pozycje z tą samą grupą podpowiadają się w Zakupach jako zamienniki.">Grupa ⇄</th><th style="width:70px" class="right" title="Cena zakupu za jednostkę (orientacyjna, zł)">Cena</th><th style="width:60px">Jedn.</th><th style="width:75px" class="right">Stan</th><th style="width:70px" class="right" title="napoczęte nie wracają z eventu (puree, pulpy)">Napocz. wylew.</th><th style="width:140px">Kto · kiedy</th><th style="width:180px" class="right">Akcje</th></tr></thead><tbody>${rows.map(c=>`
     <tr data-mid="${c.id}" ${c.active===false?'style="opacity:.45"':''}>
       <td>${c.photo_url?`<img src="${esc(c.photo_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td>
       <td><input data-mcat="${c.id}" value="${esc(c.category)}" list="catList" style="padding:5px 8px"></td>
@@ -1093,6 +1120,7 @@ async function renderMag(){
       <td><input type="number" step="any" data-mprice="${c.id}" value="${c.price??''}" placeholder="zł" style="padding:5px 8px;width:62px;text-align:right"></td>
       <td><input data-munit="${c.id}" value="${esc(c.unit||'')}" style="padding:5px 8px;width:60px"></td>
       <td><input type="number" step="any" data-mstock="${c.id}" value="${c.stock??''}" style="padding:5px 8px;width:70px;text-align:right"></td>
+      <td class="right"><input type="checkbox" data-mperish="${c.id}" ${c.perishable?'checked':''} title="Napoczęte nie wracają (puree, pulpy): przy zwrocie ekipa widzi „napoczęte wylewamy” i wpisuje tylko zamknięte sztuki."></td>
       <td class="muted" style="font-size:12px">${c.stock_updated_by?esc(c.stock_updated_by)+' · ':''}${c.stock_updated_at?new Date(c.stock_updated_at).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—'}</td>
       <td class="right"><button class="btn sm" data-mmerge="${c.id}">Scal →</button> <button class="btn sm" data-mhide="${c.id}">${c.active===false?'Przywróć':'Ukryj'}</button></td>
     </tr>`).join('')}</tbody></table>` : '<p class="muted">Brak pozycji w tym widoku.</p>';
@@ -1103,6 +1131,7 @@ async function renderMag(){
   $('m_table').querySelectorAll('[data-mgrp]').forEach(i=>i.onchange=()=>save(i.dataset.mgrp,{group_name:i.value.trim().toUpperCase()||null}));
   $('m_table').querySelectorAll('[data-mprice]').forEach(i=>i.onchange=()=>save(i.dataset.mprice,{price:i.value===''?null:Number(i.value)}));
   $('m_table').querySelectorAll('[data-mstock]').forEach(i=>i.onchange=()=>save(i.dataset.mstock,{stock:i.value===''?null:Number(i.value),stock_updated_at:new Date().toISOString()}));
+  $('m_table').querySelectorAll('[data-mperish]').forEach(i=>i.onchange=()=>save(i.dataset.mperish,{perishable:i.checked}));
   $('m_table').querySelectorAll('[data-mhide]').forEach(b=>b.onclick=async()=>{ const c=CAT.find(x=>x.id===b.dataset.mhide); await save(c.id,{active:c.active===false}); renderMag(); });
   $('m_table').querySelectorAll('[data-mmerge]').forEach(b=>b.onclick=async()=>{
     const src=CAT.find(x=>x.id===b.dataset.mmerge);

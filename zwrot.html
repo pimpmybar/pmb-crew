@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PMB — Zwrot z eventu</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0d0f;--card:#17171b;--card2:#1f1f25;--line:#2a2a32;--txt:#f2f0ea;--muted:#9a9aa6;--acc:#e8b04b;--ok:#4cc38a;--bad:#e5534b;--r:16px}
+html.light{--bg:#f4f2ec;--card:#ffffff;--card2:#edeae1;--line:#dcd8cc;--txt:#1d1c18;--muted:#6d6c64;--acc:#b07a14;--ok:#1e8a5a;--bad:#c23b34}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:600px;margin:0 auto;padding:16px 14px 110px}
+.brand{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.logo{font-family:'Bebas Neue',Inter,sans-serif;font-size:28px;letter-spacing:.06em;line-height:1}
+.logo span{color:var(--acc)}
+h1{font-family:'Bebas Neue',Inter,sans-serif;font-size:30px;letter-spacing:.03em;margin:0 0 2px;line-height:1.05}
+h2{font-family:'Bebas Neue',Inter,sans-serif;font-size:20px;letter-spacing:.05em;color:var(--acc);margin:18px 0 6px}
+.note{color:var(--muted);font-size:13px;line-height:1.45;margin:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.pill{font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px;background:var(--card2);color:var(--muted);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.pill.ok{background:rgba(76,195,138,.15);color:var(--ok)}
+.pill.warn{background:rgba(232,176,75,.15);color:var(--acc)}
+.bar{height:8px;background:var(--card2);border-radius:99px;overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;background:var(--ok);width:0;transition:width .3s}
+.tbtn{background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.item{padding:12px 4px;border-top:1px solid var(--line)}
+.item:first-of-type{border-top:0}
+.item .nm{font-size:16px;line-height:1.3;font-weight:600}
+.item .pk{font-size:12px;color:var(--muted);margin-top:2px}
+.item .row{display:flex;gap:10px;margin-top:8px;align-items:flex-end}
+.item label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px;letter-spacing:.04em;text-transform:uppercase}
+.item input{width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:11px 10px;font:inherit;font-size:18px;text-align:center;outline:none}
+.item input:focus{border-color:var(--acc)}
+.item.counted input{border-color:var(--ok)}
+.item input:disabled{opacity:.6}
+.item .f{flex:1}
+.item .u{font-size:12px;color:var(--muted);padding-bottom:12px;width:36px}
+.perish{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:7px 10px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid transparent;line-height:1.3}
+.perish{background:rgba(232,176,75,.12);color:var(--acc);border-color:rgba(232,176,75,.3);cursor:default}
+.perish b{font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.item .nt{font-size:12px;color:var(--acc);margin-top:6px}
+.sticky{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center}
+.btn{border:0;border-radius:12px;padding:14px;font:inherit;font-size:16px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--txt);border:1px solid var(--line);flex:1}
+.btn.primary{background:var(--acc);color:#151004;border-color:var(--acc)}
+.btn:disabled{opacity:.5}
+.hidden{display:none!important}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--acc);color:#111;padding:10px 16px;border-radius:12px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+.toast.on{opacity:1}
+#addBox input{width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font:inherit;font-size:16px;outline:none}
+#addList div{padding:10px 6px;border-top:1px solid var(--line);cursor:pointer}
+#addList div:first-child{border-top:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><div class="logo">PIMP MY BAR <span>ZWROT</span></div><div style="display:flex;gap:6px"><button class="tbtn" id="themeBtn" title="jasny / ciemny">◐</button><button class="tbtn" id="refBtn">Odśwież</button></div></div>
+  <div id="err" class="card hidden"><b>Brak dostępu</b><p class="note" style="margin-top:6px">Ten link jest nieaktywny albo event nie istnieje. Poproś Tomka o aktualny link.</p></div>
+  <div id="main" class="hidden">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+        <div><h1 id="title">Zwrot z eventu</h1><p class="note" id="sub"></p></div>
+        <span class="pill" id="status"></span>
+      </div>
+      <div class="bar"><i id="barFill"></i></div>
+      <p class="note" id="prog" style="margin-top:6px"></p>
+      <p class="note" style="margin-top:8px">Wpisz, ile <b>całych</b> sztuk wróciło do magazynu — to wraca na stan. Napoczęte butelki i otwarte opakowania wpisz osobno: nie liczą się do stanu, ale magazyn widzi, że są do zużycia w pierwszej kolejności.</p>
+    </div>
+    <div id="list"></div>
+    <div class="card" id="addBox" style="margin-top:12px">
+      <button class="tbtn" id="addBtn" style="width:100%">＋ Dodaj pozycję spoza listy (coś wróciło, czego nie było na liście)</button>
+      <div id="addPanel" class="hidden" style="margin-top:10px"><input id="addQ" placeholder="szukaj w katalogu…" autocomplete="off"><div id="addList" style="margin-top:6px"></div></div>
+    </div>
+  </div>
+</div>
+<div class="sticky hidden" id="foot"><button class="btn primary" id="closeBtn">✔ Zamknij zwrot</button></div>
+<div class="toast" id="toast"></div>
+<script src="pmb-core.js"></script>
+<script>
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'),1600); }
+initTheme('themeBtn');
+const P=new URLSearchParams(location.search); const W=P.get('w'); const EV=P.get('ev');
+let D=null, EXTRA=[];   // EXTRA: pozycje spoza listy dodane na tym telefonie (zanim mają wpis)
+let CAT_ORDER=[]; const catIdx=c=>{ const i=CAT_ORDER.indexOf(c); return i<0?CAT_ORDER.length:i; };
+const closed=()=>!!(D&&D.return&&D.return.status==='zamkniety');
+
+async function load(){
+  if(!W||!EV){ $('err').classList.remove('hidden'); return; }
+  try{ D=await rpc('wh_return_get',{p_mtoken:W,p_event:EV}); }catch(e){ D=null; }
+  if(!D){ $('err').classList.remove('hidden'); $('main').classList.add('hidden'); $('foot').classList.add('hidden'); return; }
+  $('err').classList.add('hidden'); $('main').classList.remove('hidden'); $('foot').classList.remove('hidden');
+  if(D.org){ applyBrand(D.org.brand); if(Array.isArray(D.org.cat_order)) CAT_ORDER=D.org.cat_order; }
+  render();
+}
+function itemsAll(){
+  const ids=new Set(D.items.map(i=>i.catalog_id));
+  return [...D.items, ...EXTRA.filter(x=>!ids.has(x.catalog_id))];
+}
+function render(){
+  const e=D.event; const items=itemsAll();
+  $('title').textContent='Zwrot: '+e.name;
+  $('sub').textContent=[fmtD(e.event_date)+(e.event_end_date&&e.event_end_date!==e.event_date?'–'+fmtD(e.event_end_date):''), e.venue].filter(Boolean).join(' · ');
+  const counted=items.filter(i=>i.counted).length, total=items.length;
+  $('barFill').style.width=(total?Math.round(counted/total*100):0)+'%';
+  $('prog').textContent=total?`policzono ${counted} z ${total} pozycji`:'Nic nie pojechało na ten event (brak spakowanych pozycji ze stanem).';
+  const st=$('status');
+  if(closed()){ st.className='pill ok'; st.textContent='zamknięty'+(D.return.closed_by?' · '+D.return.closed_by:''); $('closeBtn').textContent=`Zwrot zamknięty${D.return.closed_by?' przez '+D.return.closed_by:''}${D.return.closed_at?' · '+new Date(D.return.closed_at).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):''}`; $('closeBtn').disabled=true; $('addBox').classList.add('hidden'); }
+  else { st.className='pill warn'; st.textContent=D.return?'w toku':'nowy'; $('closeBtn').textContent='✔ Zamknij zwrot'; $('closeBtn').disabled=false; $('addBox').classList.remove('hidden'); }
+  const cats=[...new Set(items.map(i=>i.category))].sort((a,b)=>catIdx(a)-catIdx(b)||a.localeCompare(b,'pl'));
+  const dis=closed()?'disabled':'';
+  $('list').innerHTML=cats.map(cat=>`<h2>${esc(cat)}</h2><div class="card">${items.filter(i=>i.category===cat).map(i=>`
+    <div class="item ${i.counted?'counted':''}" data-cat="${esc(i.catalog_id)}">
+      <div class="nm">${esc(i.name)}</div>
+      <div class="pk">${i.packed_qty>0?`spakowano ${fmtN(i.packed_qty)} ${esc(i.unit||'')}${Number(i.reserve_qty)?` (w tym zapas ${fmtN(i.reserve_qty)})`:''}`:'spoza listy'}${i.stock!=null?` · na stanie ${fmtN(i.stock)}`:''}</div>
+      <div class="row">
+        <div class="f"><label>Wróciło (całe${i.perishable?', zamknięte':''})</label><input type="number" inputmode="decimal" step="any" min="0" data-ret="${esc(i.catalog_id)}" value="${i.returned_qty??''}" ${dis}></div>
+        ${i.perishable?'':`<div class="f"><label>Napoczęte</label><input type="number" inputmode="decimal" step="any" min="0" data-open="${esc(i.catalog_id)}" value="${i.opened_qty??''}" ${dis}></div>`}
+        <div class="u">${esc(i.unit||'')}</div>
+      </div>
+      ${i.perishable?`<div class="perish" data-perish="${esc(i.catalog_id)}"><b>Napoczęte wylewamy</b> · nie przywozimy otwartych — zamknięte wracają na stan</div>`:''}
+      ${i.note?`<div class="nt">💬 ${esc(i.note)}</div>`:''}
+    </div>`).join('')}</div>`).join('') || '';
+  $('list').querySelectorAll('[data-ret],[data-open]').forEach(inp=>inp.onchange=()=>save(inp.dataset.ret||inp.dataset.open, null));
+}
+async function save(id, note){
+  if(closed()) return;
+  const it=itemsAll().find(x=>x.catalog_id===id); if(!it) return;
+  const r=$('list').querySelector(`[data-ret="${id}"]`), o=$('list').querySelector(`[data-open="${id}"]`);
+  const ret=r&&r.value!==''?Number(r.value):(it.returned_qty??0), op=o&&o.value!==''?Number(o.value):(it.opened_qty??0);
+  const nt=note!=null?note:(it.note||null);
+  it.returned_qty=ret; it.opened_qty=op; it.note=nt; it.counted=true; render();   // optymistycznie
+  try{ D=await rpc('wh_return_set',{p_mtoken:W,p_event:EV,p_catalog:id,p_returned:ret,p_opened:op,p_note:nt}); render(); toast('Zapisano'); }
+  catch(e){ toast(/closed/.test(e.message)?'Zwrot już zamknięty':'Nie zapisało się — sprawdź internet'); load(); }
+}
+$('addBtn').onclick=()=>{ $('addPanel').classList.toggle('hidden'); $('addQ').focus(); renderAdd(); };
+$('addQ').oninput=renderAdd;
+function renderAdd(){
+  const q=$('addQ').value.trim().toLowerCase(); const have=new Set(itemsAll().map(i=>i.catalog_id));
+  const list=(D.extras||[]).filter(x=>!have.has(x.catalog_id)&&(!q||x.name.toLowerCase().includes(q)||x.category.toLowerCase().includes(q))).slice(0,12);
+  $('addList').innerHTML=list.map(x=>`<div data-extra="${esc(x.catalog_id)}"><b>${esc(x.name)}</b> <span class="note">${esc(x.category)} · na stanie ${fmtN(x.stock)} ${esc(x.unit||'')}</span></div>`).join('')||'<p class="note">Brak pozycji.</p>';
+  $('addList').querySelectorAll('[data-extra]').forEach(el=>el.onclick=()=>{ const x=D.extras.find(y=>y.catalog_id===el.dataset.extra); EXTRA.push({...x,packed_qty:0,reserve_qty:0,perishable:!!x.perishable,returned_qty:null,opened_qty:null,note:null,counted:false}); $('addPanel').classList.add('hidden'); $('addQ').value=''; render(); const inp=$('list').querySelector(`[data-ret="${x.catalog_id}"]`); if(inp) inp.focus(); });
+}
+$('closeBtn').onclick=async()=>{
+  if(closed()) return;
+  const items=itemsAll(); const left=items.filter(i=>!i.counted).length;
+  const note=prompt(left?`${left} pozycji bez wpisu — zostaną policzone jako zużyte w całości. Notatka do zwrotu (opcjonalnie):`:'Notatka do zwrotu (opcjonalnie):',''); if(note===null) return;
+  try{ D=await rpc('wh_return_close',{p_mtoken:W,p_event:EV,p_note:note}); render(); toast('Zwrot zamknięty'); }
+  catch(e){ toast('Nie udało się zamknąć — spróbuj jeszcze raz'); }
+};
+$('refBtn').onclick=()=>{ load(); toast('Odświeżono'); };
+load();
+setInterval(()=>{ if(document.visibilityState==='visible' && !document.activeElement.matches('input')) load(); },20000);
+</script>
+</body>
+</html>

@@ -117,7 +117,14 @@ pre.txt{white-space:pre-wrap;font:inherit;margin:0;line-height:1.5}
     <div class="card"><h2>Logistyka</h2><div id="whLog" style="line-height:1.7"></div></div>
     <div class="card"><h2>Pakowanie <span class="pill" id="whProg"></span></h2>
       <div class="bar" style="height:6px;background:var(--card2);border-radius:999px;overflow:hidden;margin:6px 0 10px"><i id="whBar" style="display:block;height:100%;width:0;background:var(--ok)"></i></div>
-      <div id="whPack"></div></div>
+      <div id="whPack"></div>
+      <a id="whReturn" class="btn" style="display:block;text-align:center;margin-top:12px;text-decoration:none">↩ Zwrot z eventu — co wróciło do magazynu</a></div>
+    <div class="card" id="whReserveCard"><h2>Zapas — bierzesz coś poza agendą?</h2>
+      <p class="note" style="margin-top:0">Dopisz tu wszystko, co bierzesz ekstra (te same składniki, większa ilość). Schodzi ze stanu jak reszta i wraca przez zwrot — bez tego magazyn się nie zgadza.</p>
+      <div id="whReserveList"></div>
+      <div style="display:flex;gap:8px;margin-top:10px"><input id="whResQ" placeholder="szukaj w katalogu…" autocomplete="off" style="flex:1"><input id="whResQty" type="number" inputmode="decimal" step="any" min="0" placeholder="ile" style="width:80px"></div>
+      <div id="whResHits" style="margin-top:6px"></div>
+    </div>
     <div class="card" id="whMenuCard"><h2>Menu / receptury</h2><pre class="txt" id="whMenu"></pre></div>
     <div class="card" id="whNotesCard"><h2>Uwagi</h2><div id="whNotes" class="note" style="line-height:1.6"></div></div>
   </div>
@@ -534,7 +541,7 @@ async function homeFlow(){
         <div class="note" style="margin:4px 0 0">${fmtDate(e.event_date)}${e.event_end_date&&e.event_end_date!==e.event_date?' → '+fmtDate(e.event_end_date):''} · ${esc(e.start_time||'')}${e.end_time?'–'+esc(e.end_time):''}</div>
         <div class="note" style="margin:2px 0 0">${esc([e.venue,e.address].filter(Boolean).join(', '))}</div>
         <div class="note" style="margin:2px 0 0">${e.vehicle?'🚐 '+esc(e.vehicle)+' · ':''}${e.modules?esc(e.modules)+' · ':''}zbiórka ${esc(e.meeting_time||'do ustalenia')}</div></div>
-        <div><span class="pill ${e.pack_total&&e.pack_done>=e.pack_total?'ok':e.pack_done?'warn':''}">${e.pack_total?`spakowane ${e.pack_done}/${e.pack_total}`:'brak listy'}</span></div></div></a>`).join(''):'<p class="note">Brak nadchodzących eventów.</p>'; } }catch(e){}
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><span class="pill ${e.pack_total&&e.pack_done>=e.pack_total?'ok':e.pack_done?'warn':''}">${e.pack_total?`spakowane ${e.pack_done}/${e.pack_total}`:'brak listy'}</span>${(e.event_end_date||e.event_date)<today&&e.pack_done?`<span class="pill ${e.return_status==='zamkniety'?'ok':'bad'}">${e.return_status==='zamkniety'?'zwrot zamknięty':e.return_status==='w_toku'?'zwrot w toku':'do rozliczenia'}</span>`:''}</div></div></a>`).join(''):'<p class="note">Brak nadchodzących eventów.</p>'; } }catch(e){}
   $('hIcs').onclick=()=>{
     const list=up.filter(e=>e.status==='zaakceptowany'); if(!list.length){ alert('Brak zaakceptowanych nadchodzących eventów.'); return; }
     const dt=(d,t)=>{ const p=(t||'12:00').split(':'); return d.replace(/-/g,'')+'T'+String(p[0]).padStart(2,'0')+String(p[1]||'00').padStart(2,'0')+'00'; };
@@ -553,7 +560,7 @@ async function whLoad(){ try{ WH=await rpc('wh_event',{p_mtoken:mtoken,p_event:w
 function whRender(){
   if(!WH){ $('invalid').classList.remove('hidden'); return; }
   const e=WH.event, ag=WH.agenda, P=WH.packing||[];
-  $('wh').classList.remove('hidden'); $('whBack').href='?m='+encodeURIComponent(mtoken);
+  $('wh').classList.remove('hidden'); $('whBack').href='?m='+encodeURIComponent(mtoken); $('whReturn').href=location.href.replace(/crew\.html.*$/,'zwrot.html')+'?w='+encodeURIComponent(mtoken)+'&ev='+encodeURIComponent(whEv);
   $('statusPill').textContent='Magazyn'; $('statusPill').className='pill';
   $('whName').textContent=e.name; $('whWhen').textContent=`${fmtDate(e.event_date)}${e.event_end_date&&e.event_end_date!==e.event_date?' → '+fmtDate(e.event_end_date):''} · ${e.start_time||''}${e.end_time?'–'+e.end_time:''}${e.guests?' · '+e.guests+' os.':''}`;
   $('whWhere').textContent=[e.venue,e.address].filter(Boolean).join(', ');
@@ -564,11 +571,24 @@ function whRender(){
   const done=P.filter(p=>p.packed_at).length; $('whProg').textContent=P.length?`${done}/${P.length}`:'brak listy'; $('whBar').style.width=P.length?Math.round(done/P.length*100)+'%':'0';
   const cats=[...new Set(P.map(p=>p.category))];
   $('whPack').innerHTML=cats.map(cat=>{ const its=P.filter(p=>p.category===cat); const d=its.filter(p=>p.packed_at).length;
-    return `<div class="cat"><h3>${esc(cat)}<span>${d}/${its.length}</span></h3>${its.map(p=>`<div class="pi ${p.packed_at?'done':''}" data-wid="${p.id}"><div class="box">${p.packed_at?'✓':''}</div><div class="nm">${esc(p.name)}${p.packed_at?`<span class="who">${esc(p.packed_by||'')} · ${new Date(p.packed_at).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})}</span>`:''}</div><div class="q">${esc(p.qty||'')}</div></div>`).join('')}</div>`; }).join('')||'<p class="note">Lista pakowania jeszcze nie jest gotowa.</p>';
+    return `<div class="cat"><h3>${esc(cat)}<span>${d}/${its.length}</span></h3>${its.map(p=>`<div class="pi ${p.packed_at?'done':''}" data-wid="${p.id}"><div class="box">${p.packed_at?'✓':''}</div><div class="nm">${esc(p.name)}${p.reserve?' <span class="pill warn" style="font-size:10px;padding:2px 7px">zapas</span>':''}${p.packed_at?`<span class="who">${esc(p.packed_by||'')} · ${new Date(p.packed_at).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})}</span>`:''}</div><div class="q">${esc(p.qty||'')}</div></div>`).join('')}</div>`; }).join('')||'<p class="note">Lista pakowania jeszcze nie jest gotowa.</p>';
+  const RES=P.filter(p=>p.reserve);
+  $('whReserveList').innerHTML=RES.length?RES.map(p=>`<div class="pi" data-resdel="${esc(p.catalog_id)}" style="cursor:default"><div class="nm">${esc(p.name)}</div><div class="q">${esc(p.qty||'')}</div><button class="tbtn" data-resx="${esc(p.catalog_id)}" title="Usuń z zapasu (wraca na stan)" style="padding:6px 10px;border-radius:8px;background:var(--card2);border:1px solid var(--line);color:var(--bad);font:inherit;font-weight:700">✕</button></div>`).join(''):'<p class="note">Brak zapasu.</p>';
+  $('whReserveList').querySelectorAll('[data-resx]').forEach(b=>b.onclick=async()=>{ try{ WH=await rpc('wh_reserve_remove',{p_mtoken:mtoken,p_event:whEv,p_catalog:b.dataset.resx}); whRender(); }catch(e){ alert('Nie udało się usunąć zapasu.'); } });
+  whResHits();
   $('whPack').querySelectorAll('.pi').forEach(el=>el.onclick=async()=>{ const it=P.find(p=>p.id===el.dataset.wid); const to=!it.packed_at; it.packed_at=to?new Date().toISOString():null; it.packed_by=to?'ja':null; whRender();
     try{ WH=await rpc('wh_pack',{p_mtoken:mtoken,p_item:it.id,p_packed:to}); whRender(); }catch(e){ await whLoad(); whRender(); } });
   clearTimeout(whTimer); whTimer=setTimeout(async()=>{ await whLoad(); whRender(); },20000);
 }
+function whResHits(){
+  const q=($('whResQ').value||'').trim().toLowerCase(); const box=$('whResHits'); if(!WH||!q){ box.innerHTML=''; return; }
+  const have=new Set((WH.packing||[]).filter(p=>p.reserve).map(p=>p.catalog_id));
+  const hits=(WH.catalog||[]).filter(c=>!have.has(c.id)&&(c.name.toLowerCase().includes(q)||c.category.toLowerCase().includes(q))).slice(0,8);
+  box.innerHTML=hits.map(c=>`<div class="pi" data-resadd="${esc(c.id)}"><div class="nm">${esc(c.name)}<span class="who">${esc(c.category)} · na stanie ${esc(String(c.stock))} ${esc(c.unit||'')}</span></div><div class="q">＋</div></div>`).join('')||'<p class="note">Nic nie pasuje.</p>';
+  box.querySelectorAll('[data-resadd]').forEach(el=>el.onclick=async()=>{ const qty=Number($('whResQty').value); if(!(qty>0)){ $('whResQty').focus(); alert('Wpisz najpierw ilość zapasu.'); return; }
+    try{ WH=await rpc('wh_reserve_add',{p_mtoken:mtoken,p_event:whEv,p_catalog:el.dataset.resadd,p_qty:qty}); $('whResQ').value=''; $('whResQty').value=''; whRender(); }catch(e){ alert('Nie udało się dodać zapasu.'); } });
+}
+$('whResQ').oninput=whResHits;
 async function whFlow(){ await whLoad(); $('loading').classList.add('hidden'); whRender(); }
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden && WH){ whLoad().then(whRender); } });
 (async()=>{
