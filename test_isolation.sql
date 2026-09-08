@@ -19,6 +19,7 @@ insert into catalog (org_id, category, name, unit, stock) values ('00000000-0000
 insert into recipes (org_id, name, category) values ('00000000-0000-0000-0000-000000000001', 'Drink A', 'KLASYKA');
 insert into shop_lists (org_id, week_key, week_from, week_to, items) values ('00000000-0000-0000-0000-000000000001', 'wkA', current_date - 1, current_date + 5, '[{"key":"a1","name":"Rum A","qty":1}]');
 insert into packing_items (org_id, event_id, category, name, qty_num, unit) select '00000000-0000-0000-0000-000000000001', id, 'ALKOHOLE', 'Rum A pack', 2, 'bt' from events where invite_code='invA';
+insert into glass_protocols (org_id, event_id, kind, price_per_item) select '00000000-0000-0000-0000-000000000001', id, 'liczenie', 14 from events where invite_code='invA';
 -- B
 insert into events (org_id, name, event_date, status, invite_code) values ('00000000-0000-0000-0000-0000000000b2', 'Event B', current_date + 9, 'potwierdzony', 'invB');
 insert into crew (org_id, phone, first_name, my_token, warehouse_access) values ('00000000-0000-0000-0000-0000000000b2', '+48100000002', 'Bartek', 'tokB', true);
@@ -43,6 +44,9 @@ select assert_eq((select count(*) from shop_lists where org_id = '00000000-0000-
 select assert_eq((select count(*) from remanenty where org_id = '00000000-0000-0000-0000-000000000001'), 0::bigint, 'RLS: B widzi remanenty A');
 select assert_eq((select count(*) from updates where org_id = '00000000-0000-0000-0000-000000000001'), 0::bigint, 'RLS: B widzi aktualizacje A');
 select assert_eq((select count(*) from shop_checks where org_id = '00000000-0000-0000-0000-000000000001'), 0::bigint, 'RLS: B widzi odhaczenia A');
+select assert_eq((select count(*) from stock_moves where org_id = '00000000-0000-0000-0000-000000000001'), 0::bigint, 'RLS: B widzi ruchy magazynowe A');
+select assert_eq((select count(*) from event_returns where org_id = '00000000-0000-0000-0000-000000000001'), 0::bigint, 'RLS: B widzi zwroty A');
+select assert_eq((select count(*) from glass_protocols where org_id = '00000000-0000-0000-0000-000000000001'), 0::bigint, 'RLS: B widzi protokoły szkła A');
 select assert_eq((select count(*) from orgs), 1::bigint, 'RLS: B widzi tylko swoją organizację');
 -- B widzi swoje
 select assert_eq((select count(*) from events), 1::bigint, 'RLS: B widzi swój event');
@@ -75,7 +79,12 @@ select assert_true(crew_packing('asgB')::text not like '%Rum A pack%', 'crew_pac
 -- stock key (remanent)
 select assert_true(stock_list('keyB')::text not like '%Rum A%', 'stock_list: klucz B widzi katalog A');
 select assert_eq((select count(*) from json_array_elements(stock_list('keyB'))), 1::bigint, 'stock_list: klucz B widzi 1 pozycję');
-select stock_set('keyB', (select id from catalog where name='Rum A'), 99, 'x');
+do $$ begin
+  perform stock_set('keyB', (select id from catalog where name='Rum A'), 99, 'x');
+  raise exception 'ASSERT: stock_set kluczem B na pozycji A powinien być odrzucony';
+exception when others then
+  if sqlerrm not like '%not found%' then raise; end if;
+end $$;
 -- slug organizacji
 select assert_eq(crew_terms('orgb')->>'terms', 'TERMS-B2', 'crew_terms: slug B daje warunki B (po upsercie z sekcji 1)');
 select assert_eq(crew_terms('pmb')->>'terms', 'TERMS-A', 'crew_terms: slug pmb daje warunki A');
@@ -91,5 +100,11 @@ select assert_eq((select stock from catalog where name='Rum A'), 7::numeric, 'st
 -- ten sam numer telefonu może istnieć w dwóch organizacjach
 insert into crew (org_id, phone, first_name) values ('00000000-0000-0000-0000-000000000001', '+48600100200', 'Ten sam numer w A');
 select assert_eq((select count(*) from crew where phone='+48600100200'), 2::bigint, 'unikalność telefonu per organizacja');
+
+-- zwrot z eventu: token B nie otwiera eventu A
+select assert_true(wh_return_get('tokB', (select id from events where invite_code='invA')) is null, 'wh_return_get: B otwiera event A');
+select assert_true(wh_return_get('tokB', (select id from events where invite_code='invB')) is not null, 'wh_return_get: B otwiera swój event');
+-- protokół szkła: token B nie otwiera eventu A
+select assert_true(wh_glass_get('tokB', (select id from events where invite_code='invA')) is null, 'wh_glass_get: B otwiera event A');
 
 rollback;

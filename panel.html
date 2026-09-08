@@ -228,6 +228,14 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
               <p class="muted" style="margin-top:6px">Wydano = odhaczone w pakowaniu (stan spada w tej chwili). Wróciło = wpisane przez ekipę w zwrocie z eventu (link „Zwrot z eventu” w widoku magazynowym). Zużyto = różnica.</p>
               <div id="pk_usage"></div>
             </div>
+            <div class="card hidden" id="pk_glassCard">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                <h2 style="margin:0">Szkło — protokół</h2>
+                <div style="display:flex;gap:6px;align-items:center" id="pk_glassHead"></div>
+              </div>
+              <p class="muted" style="margin-top:6px">Wydanie i zwrot podpisuje organizator na telefonie ekipy (link „Protokół szkła” w widoku magazynowym eventu). Straty liczy wyłącznie protokół — w zwrocie z eventu szkło jest tylko do odczytu.</p>
+              <div id="pk_glass"></div>
+            </div>
             <div class="card">
               <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
                 <h2 style="margin:0">Ilości na ten event (agenda PMB)</h2>
@@ -285,8 +293,8 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
                 <div><label>Barmanów</label><input id="e_bart" type="number"></div>
                 <div><label>Pomocników</label><input id="e_help" type="number"></div>
               </div>
-              <div class="grid g3">
-                <div><label>Stawka za brak szkła (zł/szt., puste = z ustawień organizacji)</label><input id="e_glass" type="number" step="0.01" placeholder="np. 14"></div>
+              <div class="grid g3" id="e_glassRow">
+                <div><label>Stawka za szkło (zł/szt.)</label><input id="e_glass_price" type="number" step="0.01"></div>
               </div>
               <label>Opis dla barmana (widoczny przed akceptacją)</label><textarea id="e_summary"></textarea>
               <h2 style="margin-top:18px">Link grupowy (jeden na grupę WhatsApp)</h2>
@@ -437,17 +445,15 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
         <label>Nazwa marki (logo na stronach)</label><input id="set_brand" style="width:280px">
         <label>Kolejność kategorii w zakupach (po przecinku)</label><input id="set_catOrder" style="width:100%">
         <label>Kategorie kupowane domyślnie (po przecinku)</label><input id="set_buyDefault" style="width:100%">
-        <h2 style="margin-top:16px">Zwrot z eventu</h2>
-        <p class="muted" style="margin-top:0">Jak ekipa liczy zwrot w każdej kategorii. Kategorie <b>z napoczętymi</b>: wpisują całe sztuki i osobno napoczęte. Kategorie <b>liczone brakami</b> (szkło, sprzęt): wpisują tylko braki, reszta wróciła. Pozostałe kategorie: tylko całe sztuki. Przy zamknięciu zwrotu pozycje bez wpisu dostają wartość domyślną: zużywalne = zużyte, liczone brakami = wróciło w całości.</p>
+        <label>Domyślna stawka za szkło (zł/szt.)</label><input id="set_glassPrice" type="number" step="0.01" style="width:140px">
+        <h2 style="margin-top:16px">Dane firmy (na protokołach i fakturach)</h2>
         <div class="grid g2">
-          <div><label>Kategorie z napoczętymi (po przecinku)</label><input id="set_retOpen" style="width:100%"></div>
-          <div><label>Kategorie liczone brakami (po przecinku)</label><input id="set_retShort" style="width:100%"></div>
+          <div><label>Nazwa firmy</label><input id="set_company"></div>
+          <div><label>NIP</label><input id="set_nip"></div>
+          <div><label>Adres</label><input id="set_address"></div>
+          <div><label>E-mail</label><input id="set_email"></div>
+          <div><label>Telefon</label><input id="set_phone"></div>
         </div>
-        <div class="grid g2">
-          <div><label>Stawka za brak szkła (zł/szt.)</label><input id="set_glassPrice" type="number" step="0.01" style="width:120px"></div>
-          <div><label>Kategorie wyceniane tą stawką (po przecinku)</label><input id="set_glassCats" style="width:100%"></div>
-        </div>
-        <label>Podpowiedzi na ekranie zwrotu (jedna linia = KATEGORIA: tekst)</label><textarea id="set_retNotes" style="width:100%;min-height:120px"></textarea>
         <div style="margin-top:8px"><button class="btn primary" id="set_saveOrg">Zapisz organizację</button></div>
       </div>
       <div class="card">
@@ -483,6 +489,9 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
 const money = n => n==null?'—':Number(n).toLocaleString('pl-PL')+' zł';
 let events=[], people=[], cur=null, asgs=[], curPerson=null;
 let ORG=null;   // wiersz orgs zalogowanego użytkownika (od update27)
+let GLASS_TODO=new Set();   // eventy z niezamkniętym rozliczeniem szkła (od update29)
+let GLASS_NORET=new Set();  // eventy po terminie z podpisanym wydaniem, ale bez zwrotu
+const glassPriceDefault = () => (ORG&&ORG.config&&ORG.config.glass_price!=null) ? ORG.config.glass_price : 14;   // tylko podpowiedź w polu; prawda jest w orgs.config
 const CREW_URL_DEFAULT = 'https://pimpmybar.github.io/pmb-crew/crew.html';
 const crewUrl = () => { const saved = localStorage.getItem('pmb_crew_url'); if (saved && /^https?:\/\//.test(saved)) return saved;
   if (location.protocol === 'file:') return CREW_URL_DEFAULT;
@@ -597,12 +606,20 @@ $('viewList').onclick=()=>{ $('evList').classList.remove('hidden'); $('evCal').c
 $('viewCal').onclick=()=>{ $('evList').classList.add('hidden'); $('evCal').classList.remove('hidden'); document.querySelector('.cols').classList.add('wide'); $('viewCal').style.fontWeight='700'; $('viewList').style.fontWeight=''; if(cur){ calY=+cur.event_date.slice(0,4); calM=+cur.event_date.slice(5,7)-1; } renderCal(); };
 
 function renderEvList(){
-  $('evList').innerHTML = events.map(e=>`<div class="evitem ${cur&&cur.id===e.id?'on':''}" data-id="${e.id}"><b>${esc(e.name)}</b><small>${e.event_date}${endOf(e)!==e.event_date?' → '+endOf(e).slice(5):''} · <span class="pill ${STATUS[e.status]?.[1]||''}">${STATUS[e.status]?.[0]||e.status}</span> ${pctPill(e)}${carsOf(e).length?' · '+carsOf(e).join('+'):''}${carConflicts(e).length?' <span class="pill bad">kolizja auta</span>':''}</small></div>`).join('') || '<div class="muted">Brak eventów</div>';
+  $('evList').innerHTML = events.map(e=>`<div class="evitem ${cur&&cur.id===e.id?'on':''}" data-id="${e.id}"><b>${esc(e.name)}</b><small>${e.event_date}${endOf(e)!==e.event_date?' → '+endOf(e).slice(5):''} · <span class="pill ${STATUS[e.status]?.[1]||''}">${STATUS[e.status]?.[0]||e.status}</span> ${pctPill(e)}${carsOf(e).length?' · '+carsOf(e).join('+'):''}${carConflicts(e).length?' <span class="pill bad">kolizja auta</span>':''}${GLASS_TODO.has(e.id)?' <span class="pill warn">szkło do rozliczenia</span>':''}${GLASS_NORET.has(e.id)?' <span class="pill bad">szkło bez zwrotu</span>':''}</small></div>`).join('') || '<div class="muted">Brak eventów</div>';
   document.querySelectorAll('.evitem').forEach(el=>el.onclick=()=>openEvent(el.dataset.id));
 }
 async function loadEvents(){
   events = await api('GET','events?select=*&order=event_date.desc');
   try{ const acc=await api('GET','assignments?select=event_id,role&status=eq.zaakceptowany'); ACC={}; acc.forEach(a=>{ const o=ACC[a.event_id]=ACC[a.event_id]||{b:0,p:0}; if(a.role==='pomocnik') o.p++; else o.b++; }); }catch(e){}
+  // jedno zapytanie na obie plakietki: szkło do rozliczenia (zwrot bez settled_at) i szkło bez zwrotu (event po terminie)
+  try{
+    const gp=await apiGet('glass_protocols?kind=in.(wydanie,zwrot)&voided_at=is.null&select=event_id,kind,settled_at');
+    const zwr=new Set(gp.filter(g=>g.kind==='zwrot').map(g=>g.event_id)), today=new Date().toISOString().slice(0,10);
+    GLASS_TODO=new Set(gp.filter(g=>g.kind==='zwrot'&&!g.settled_at).map(g=>g.event_id));
+    GLASS_NORET=new Set(gp.filter(g=>g.kind==='wydanie'&&!zwr.has(g.event_id)).map(g=>g.event_id)
+      .filter(id=>{ const e=events.find(x=>x.id===id); return e && endOf(e)<today; }));
+  }catch(e){ GLASS_TODO=new Set(); GLASS_NORET=new Set(); }  // brak update29
   renderEvList(); renderCal();
 }
 async function openEvent(id){
@@ -614,12 +631,13 @@ async function openEvent(id){
   $('e_name').value=cur.name||''; $('e_client').value=cur.client||''; $('e_date').value=cur.event_date||''; $('e_end_date').value=cur.event_end_date||''; $('e_start').value=cur.start_time||''; $('e_end').value=cur.end_time||'';
   $('e_status').value=cur.status; $('e_venue').value=cur.venue||''; $('e_address').value=cur.address||''; $('e_map').value=cur.map_url||'';
   $('e_vurl').value=cur.venue_url||''; $('e_pay').value=cur.payment_info||''; $('e_travel').value=cur.travel_note||'';
-  $('e_drb').value=cur.default_rate_bartender??''; $('e_glass').value=cur.glass_price??''; $('e_drh').value=cur.default_rate_helper??''; $('e_drn').value=cur.default_rate_note||''; $('e_open').checked=cur.invite_open!==false;
+  $('e_drb').value=cur.default_rate_bartender??''; $('e_drh').value=cur.default_rate_helper??''; $('e_drn').value=cur.default_rate_note||''; $('e_open').checked=cur.invite_open!==false;
   const inv = cur.invite_code ? `${crewUrl()}?e=${cur.invite_code}` : '(zapisz event, żeby wygenerować)';
   $('e_invite').textContent=inv;
   $('e_invCopy').onclick=()=>{ navigator.clipboard.writeText(inv); toast('Link skopiowany'); };
   $('e_invMsg').onclick=()=>{ navigator.clipboard.writeText(`Cześć! Tu Tomek z Pimp My Bar. Szukam ekipy na: ${cur.name} — ${cur.event_date}, ${cur.start_time||''}–${cur.end_time||''}, ${cur.venue||''}. Kliknij, wpisz swój numer i zobacz warunki + potwierdź: ${inv}`); toast('Wiadomość skopiowana'); };
   $('e_guests').value=cur.guests??''; $('e_bart').value=cur.bartenders_needed??''; $('e_help').value=cur.helpers_needed??''; $('e_summary').value=cur.summary||'';
+  $('e_glass_price').value=cur.glass_price??''; $('e_glass_price').placeholder=String(glassPriceDefault()); $('e_glassRow').classList.toggle('hidden',!('glass_price' in cur));
   // agenda
   $('g_place').value=cur.meeting_place||''; $('g_time').value=cur.meeting_time||''; $('g_dress').value=cur.dress_code||''; $('g_pack').value=cur.packing_list||'';
   $('g_cash').checked=!!cur.cash_needed; $('g_cashnote').value=cur.cash_note||''; $('g_cname').value=cur.contact_name||'Tomek'; $('g_cphone').value=cur.contact_phone||'';
@@ -643,7 +661,8 @@ $('newEvent').onclick = async()=>{
 $('e_save').onclick = async()=>{
   const n = v => v===''?null:Number(v);
   const body={name:$('e_name').value,client:$('e_client').value,event_date:$('e_date').value,event_end_date:$('e_end_date').value||null,start_time:$('e_start').value,end_time:$('e_end').value,status:$('e_status').value,
-    venue:$('e_venue').value,address:$('e_address').value,map_url:$('e_map').value,venue_url:$('e_vurl').value,payment_info:$('e_pay').value,travel_note:$('e_travel').value,default_rate_bartender:n($('e_drb').value),default_rate_helper:n($('e_drh').value),default_rate_note:$('e_drn').value,invite_open:$('e_open').checked,guests:n($('e_guests').value),bartenders_needed:n($('e_bart').value),helpers_needed:n($('e_help').value),summary:$('e_summary').value,glass_price:n($('e_glass').value)};
+    venue:$('e_venue').value,address:$('e_address').value,map_url:$('e_map').value,venue_url:$('e_vurl').value,payment_info:$('e_pay').value,travel_note:$('e_travel').value,default_rate_bartender:n($('e_drb').value),default_rate_helper:n($('e_drh').value),default_rate_note:$('e_drn').value,invite_open:$('e_open').checked,guests:n($('e_guests').value),bartenders_needed:n($('e_bart').value),helpers_needed:n($('e_help').value),summary:$('e_summary').value};
+  if('glass_price' in cur) body.glass_price=n($('e_glass_price').value);   // kolumna dopiero od update29
   await api('PATCH',`events?id=eq.${cur.id}`,body); toast('Zapisano'); await loadEvents(); openEvent(cur.id);
 };
 $('e_del').onclick = async()=>{ if(!confirm('Usunąć event razem z przypisaniami?')) return; await api('DELETE',`events?id=eq.${cur.id}`,null,'return=minimal'); cur=null; $('evPane').classList.add('hidden'); loadEvents(); };
@@ -691,8 +710,7 @@ async function loadAsgs(){
     <td>${a.role}</td><td>${money(a.rate_amount)}${a.rate_unit==='godzina'?'/h':''}<br><span class="muted">${esc(a.rate_note||'')}</span></td>
     <td><span class="pill ${s[1]}">${s[0]}</span>${a.counter_offer?`<br><span class="muted">chce: ${esc(a.counter_offer)}</span>`:''}${a.status==='zaakceptowany'&&cur.agenda_published&&(a.seen_agenda_version||0)<(cur.agenda_version||0)?'<br><span class="pill info">nie widział agendy</span>':''}</td>
     <td><button class="btn sm" data-copy="${a.id}">Kopiuj link</button> <a class="btn sm" target="_blank" href="https://wa.me/${esc((c.phone||'').replace(/\D/g,''))}?text=${encodeURIComponent(waMsg(a))}">WA</a></td>
-    <td class="right"><button class="btn sm ${a.can_return?'primary':''}" data-ret="${a.id}" title="Czy ta osoba rozlicza zwrot z eventu (wpisuje w magazynie, co wróciło)">${a.can_return?'↩ Zwrot ✓':'Zwrot'}</button> <button class="btn sm" data-rate="${a.id}">Stawka</button> <button class="btn sm danger" data-del="${a.id}">✕</button></td></tr>`;}).join('') || '<tr><td colspan="6" class="muted">Nikogo jeszcze nie dodałeś.</td></tr>';
-  $('asgBody').querySelectorAll('[data-ret]').forEach(b=>b.onclick=async()=>{ const a=asgs.find(x=>x.id===b.dataset.ret); try{ await api('PATCH',`assignments?id=eq.${a.id}`,{can_return:!a.can_return},'return=minimal'); }catch(e){ toast('Brak kolumny — uruchom update31.sql'); return; } toast(a.can_return?'Zwrot wyłączony':'Zwrot włączony — zobaczy przycisk pod swoim linkiem'); loadAsgs(); });
+    <td class="right"><button class="btn sm" data-rate="${a.id}">Stawka</button> <button class="btn sm danger" data-del="${a.id}">✕</button></td></tr>`;}).join('') || '<tr><td colspan="6" class="muted">Nikogo jeszcze nie dodałeś.</td></tr>';
   $('asgBody').querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{ navigator.clipboard.writeText(linkFor(asgs.find(a=>a.id===b.dataset.copy))); toast('Link skopiowany'); });
   $('asgBody').querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(!confirm('Usunąć z eventu? Link przestanie działać.')) return; await api('DELETE',`assignments?id=eq.${b.dataset.del}`,null,'return=minimal'); loadAsgs(); });
   $('asgBody').querySelectorAll('[data-rate]').forEach(b=>b.onclick=async()=>{ const a=asgs.find(x=>x.id===b.dataset.rate); const v=prompt('Nowa stawka (zł):',a.rate_amount??''); if(v===null) return; const note=prompt('Dopisek:',a.rate_note||''); await api('PATCH',`assignments?id=eq.${a.id}`,{rate_amount:v===''?null:Number(v),rate_note:note}); loadAsgs(); });
@@ -759,7 +777,7 @@ async function loadPack(){
   $('pk_list').querySelectorAll('[data-pk]').forEach(cb=>cb.onchange=async()=>{ await api('PATCH',`packing_items?id=eq.${cb.dataset.pk}`,{packed_at:cb.checked?new Date().toISOString():null,packed_by:null}); loadPack(); });
   $('pk_list').querySelectorAll('[data-pkd]').forEach(b=>b.onclick=async()=>{ await api('DELETE',`packing_items?id=eq.${b.dataset.pkd}`,null,'return=minimal'); loadPack(); });
   $('pk_list').querySelectorAll('[data-pke]').forEach(b=>b.onclick=async()=>{ const it=PK.find(p=>p.id===b.dataset.pke); const name=prompt('Nazwa:',it.name); if(name===null) return; const qty=prompt('Ilość:',it.qty||''); if(qty===null) return; await api('PATCH',`packing_items?id=eq.${it.id}`,{name,qty}); loadPack(); });
-  loadUsage();
+  loadUsage(); loadGlass();
 }
 async function loadUsage(){
   let usage=[], ret=null;
@@ -772,17 +790,55 @@ async function loadUsage(){
   rb.onclick=async()=>{ if(!confirm('Otworzyć zwrot ponownie? Ekipa będzie mogła poprawić wpisy.')) return; await api('PATCH',`event_returns?id=eq.${ret.id}`,{status:'w_toku',closed_at:null,closed_by:null},'return=minimal'); loadUsage(); toast('Zwrot otwarty'); };
   if(!usage.length){ $('pk_usage').innerHTML='<p class="muted">Nic jeszcze nie wydano (żadna pozycja ze stanem nie jest odhaczona).</p>'; return; }
   const tu=usage.reduce((a,u)=>a+Number(u.used||0),0);
-  const hasShort=usage.some(u=>u.mode==='shortage'||Number(u.shortage)>0);
-  const glassQty=usage.reduce((a,u)=>a+(u.shortage_value!=null?Number(u.shortage||0):0),0), glassVal=usage.reduce((a,u)=>a+Number(u.shortage_value||0),0);
-  const rate=cur.glass_price??((ORG&&ORG.config&&ORG.config.glass_price)??null);
-  let cat=null, html='<table><thead><tr><th>Pozycja</th><th class="right">Wydano</th><th class="right" title="w tym zapas poza agendą">w tym zapas</th><th class="right">Wróciło</th><th class="right" title="napoczęte, poza stanem">Napoczęte</th>'+(hasShort?'<th class="right" title="braki wpisane przez ekipę (szkło, sprzęt)">Braki</th>':'')+'<th class="right">Zużyto</th><th title="czy organizator wie o zwrocie">Organizator</th></tr></thead><tbody>';
-  const cols=hasShort?8:7;
-  usage.forEach(u=>{ if(u.category!==cat){ cat=u.category; html+=`<tr class="cat"><td colspan="${cols}" style="color:var(--acc);font-weight:700;padding-top:10px">${esc(cat)}</td></tr>`; }
-    const sh=Number(u.shortage||0);
-    html+=`<tr><td>${esc(u.name)} <span class="muted">${esc(u.unit||'')}</span>${u.auto?' <span class="muted" title="wpis domyślny przy zamknięciu / zbiorczy" style="font-size:10px">domyślnie</span>':''}</td><td class="right">${fmtN(u.issued)}</td><td class="right muted">${Number(u.reserve)?fmtN(u.reserve):'·'}</td><td class="right">${fmtN(u.returned)}</td><td class="right muted">${Number(u.opened)?fmtN(u.opened):'·'}</td>${hasShort?`<td class="right" ${sh>0?'style="color:var(--bad);font-weight:700"':'class="right muted"'}>${sh>0?fmtN(sh)+(u.shortage_value!=null?` <span class="muted" style="font-weight:400">= ${fmtN(u.shortage_value)} zł</span>`:''):'·'}</td>`:''}<td class="right"><b>${fmtN(u.used)}</b></td><td>${(u.mode!=='shortage'&&Number(u.returned)>0)?(u.client_aware===true?'<span class="pill ok" style="font-size:10px">wie · od faktury</span>':u.client_aware===false?'<span class="pill warn" style="font-size:10px">nie wie · liczymy</span>':'<span class="muted">?</span>'):''}</td></tr>`; });
+  let cat=null, html='<table><thead><tr><th>Pozycja</th><th class="right">Wydano</th><th class="right" title="w tym zapas poza agendą">w tym zapas</th><th class="right">Wróciło</th><th class="right" title="napoczęte, poza stanem">Napoczęte</th><th class="right">Zużyto</th></tr></thead><tbody>';
+  usage.forEach(u=>{ if(u.category!==cat){ cat=u.category; html+=`<tr class="cat"><td colspan="6" style="color:var(--acc);font-weight:700;padding-top:10px">${esc(cat)}</td></tr>`; }
+    html+=`<tr><td>${esc(u.name)} <span class="muted">${esc(u.unit||'')}</span></td><td class="right">${fmtN(u.issued)}</td><td class="right muted">${Number(u.reserve)?fmtN(u.reserve):'·'}</td><td class="right">${fmtN(u.returned)}</td><td class="right muted">${Number(u.opened)?fmtN(u.opened):'·'}</td><td class="right"><b>${fmtN(u.used)}</b></td></tr>`; });
   html+=`</tbody></table><p class="muted" style="margin:8px 0 0">${usage.length} pozycji · zużyte łącznie ${fmtN(tu)} (różne jednostki)</p>`;
-  if(glassQty>0) html+=`<p id="pk_glass" style="margin:6px 0 0"><b>Braki szkła do rozliczenia z organizatorem: ${fmtN(glassQty)} szt. × ${fmtN(rate||0)} zł = ${fmtN(glassVal)} zł</b> <span class="muted">(stawka ${cur.glass_price!=null?'z eventu':'z ustawień organizacji'})</span></p>`;
   $('pk_usage').innerHTML=html;
+}
+/* --- protokół szkła (od update29): wydanie + zwrot, straty i potwierdzenie rozliczenia --- */
+async function loadGlass(){
+  let gp=[];
+  // bez signature_data (kilkadziesiąt KB na protokół, w panelu niepotrzebne)
+  const COLS='id,event_id,kind,price_per_item,organizer_name,organizer_phone,signed_at,crew_name,payment_method,payment_amount,invoice_data,loss_amount,settled_at,settled_by,public_token,note,created_at';
+  try{ gp=await apiGet(`glass_protocols?event_id=eq.${cur.id}&voided_at=is.null&select=${COLS},glass_protocol_items(*)&order=created_at`); }catch(e){ $('pk_glassCard').classList.add('hidden'); return; }  // brak update29
+  $('pk_glassCard').classList.remove('hidden');
+  const wyd=gp.find(g=>g.kind==='wydanie'), zwr=gp.find(g=>g.kind==='zwrot'), tok=(zwr||wyd||gp[0]||{}).public_token;
+  $('pk_glassHead').innerHTML = tok?`<a class="btn sm" target="_blank" href="protokol.html?p=${encodeURIComponent(tok)}">Otwórz protokół</a>`:'';
+  if(!gp.length){ $('pk_glass').innerHTML='<p class="muted">Brak protokołu szkła — Kuba wypełnia go w szklo.html z widoku magazynowego eventu.</p>'; return; }
+  const it=g=>(g&&g.glass_protocol_items)||[], qty=(g,c)=>{ const r=it(g).find(x=>x.catalog_id===c); return r?Number(r.qty||0):0; };
+  const cats=[...new Set([...it(wyd),...it(zwr)].map(x=>x.catalog_id))];
+  let html='';
+  if(wyd) html+=`<p><b>Wydanie</b> — podpisał ${esc(wyd.organizer_name||'—')}${wyd.signed_at?' · '+new Date(wyd.signed_at).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):''}${wyd.crew_name?' · ekipa: '+esc(wyd.crew_name):''} · ${fmtN(it(wyd).reduce((s,x)=>s+Number(x.qty||0),0))} szt. <button class="btn sm" id="pk_glassVoidW">Anuluj protokół</button></p>`;
+  else html+='<p class="muted">Wydanie jeszcze niepodpisane.</p>';
+  if(!zwr){ html+=`<table><thead><tr><th>Pozycja</th><th class="right">Wydano</th></tr></thead><tbody>${cats.map(c=>`<tr><td>${esc((it(wyd).find(x=>x.catalog_id===c)||{}).name||'')}</td><td class="right">${fmtN(qty(wyd,c))}</td></tr>`).join('')}</tbody></table>`;
+    html+='<p class="muted" style="margin:8px 0 0">Zwrot jeszcze niepodpisany — straty policzą się po podpisie organizatora.</p>'; }
+  else {
+    const price=Number(zwr.price_per_item||0);
+    const loss=wyd ? cats.reduce((s,c)=>s+Math.max(0,qty(wyd,c)-qty(zwr,c)),0)
+      : (zwr.loss_amount!=null&&price>0 ? Number(zwr.loss_amount)/price : 0);   // bez wydania sztuk nie ma z czego odjąć — liczymy z kwoty
+    const amount=zwr.loss_amount!=null?Number(zwr.loss_amount):loss*price;
+    html+=`<table><thead><tr><th>Pozycja</th><th class="right">Wydano</th><th class="right">Wróciło</th><th class="right">Straty</th></tr></thead><tbody>${cats.map(c=>{ const nm=(it(wyd).find(x=>x.catalog_id===c)||it(zwr).find(x=>x.catalog_id===c)||{}).name||''; const l=Math.max(0,qty(wyd,c)-qty(zwr,c));
+      return `<tr><td>${esc(nm)}</td><td class="right">${fmtN(qty(wyd,c))}</td><td class="right">${fmtN(qty(zwr,c))}</td><td class="right"><b>${l?fmtN(l):'·'}</b></td></tr>`; }).join('')}</tbody></table>`;
+    const pay = zwr.payment_method==='gotowka' ? 'gotówka' : zwr.payment_method==='faktura' ? 'faktura'+((zwr.invoice_data||{}).nip?' (NIP '+esc(zwr.invoice_data.nip)+')':'') : 'forma płatności niepodana';
+    html+=`<p style="margin:8px 0 0">straty ${fmtN(loss)} szt. × ${fmtN(price)} zł = <b>${fmtN(amount)} zł</b> · ${pay}</p>`;
+    html+=zwr.settled_at
+      ? `<p style="margin:8px 0 0"><span class="pill ok">rozliczone</span> ${esc(zwr.settled_by||'')} ${new Date(zwr.settled_at).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} <button class="btn sm" id="pk_glassUnsettle">Cofnij rozliczenie</button> <button class="btn sm" id="pk_glassVoidZ">Anuluj protokół</button></p>`
+      : `<p style="margin:8px 0 0"><span class="pill warn">do rozliczenia</span> <button class="btn sm primary" id="pk_glassSettle">Rozliczone</button> <button class="btn sm" id="pk_glassVoidZ">Anuluj protokół</button></p>`;
+  }
+  $('pk_glass').innerHTML=html;
+  const who=()=>((session||{}).user||{}).email||'panel';
+  if($('pk_glassSettle')) $('pk_glassSettle').onclick=async()=>{ await api('PATCH',`glass_protocols?id=eq.${zwr.id}`,{settled_at:new Date().toISOString(),settled_by:who()},'return=minimal'); toast('Szkło rozliczone'); await loadGlass(); loadEvents(); };
+  if($('pk_glassUnsettle')) $('pk_glassUnsettle').onclick=async()=>{ if(!confirm('Cofnąć potwierdzenie rozliczenia szkła?')) return; await api('PATCH',`glass_protocols?id=eq.${zwr.id}`,{settled_at:null,settled_by:null},'return=minimal'); toast('Rozliczenie cofnięte'); await loadGlass(); loadEvents(); };
+  // anulowanie: baza cofa ruchy magazynowe i wpisy w zwrocie z eventu, protokół znika z ekranów i zwalnia miejsce na nowy
+  const voidP=async(id,what)=>{
+    if(!confirm(`Anulować protokół ${what}? Ruchy magazynowe zostaną cofnięte, a ekipa będzie mogła podpisać nowy.`)) return;
+    try{ await api('POST','rpc/glass_protocol_void',{p_protocol:id}); }
+    catch(e){ toast(/void zwrot first/.test(String(e&&e.message||''))?'Najpierw anuluj protokół zwrotu':'Nie udało się anulować protokołu'); return; }
+    toast('Protokół anulowany'); await loadGlass(); loadEvents();
+  };
+  if($('pk_glassVoidW')) $('pk_glassVoidW').onclick=()=>voidP(wyd.id,'wydania');
+  if($('pk_glassVoidZ')) $('pk_glassVoidZ').onclick=()=>voidP(zwr.id,'zwrotu');
 }
 $('pk_refresh').onclick=loadPack;
 $('pk_reset').onclick=async()=>{ if(!confirm('Odznaczyć wszystko?')) return; await api('PATCH',`packing_items?event_id=eq.${cur.id}`,{packed_at:null,packed_by:null}); loadPack(); };
@@ -1237,17 +1293,14 @@ async function loadSettings(){
   $('set_stockNew').onclick=async()=>{ if(!confirm('Wygenerować nowy link do remanentu? Stary przestanie działać.')) return; const k=[...crypto.getRandomValues(new Uint8Array(8))].map(b=>b.toString(16).padStart(2,'0')).join(''); await saveSetting('stock_key',k); toast('Nowy link gotowy'); loadSettings(); };
   $('set_recruitCopy').onclick=()=>{ navigator.clipboard.writeText(link); toast('Link skopiowany'); };
   if(ORG){ const c=ORG.config||{}; $('set_brand').value=c.brand||ORG.name||''; $('set_catOrder').value=CAT_ORDER.join(', '); $('set_buyDefault').value=[...BUY_DEFAULT].join(', ');
-    const modes=c.return_modes||{}; $('set_retOpen').value=Object.keys(modes).filter(k=>modes[k]==='open').join(', '); $('set_retShort').value=Object.keys(modes).filter(k=>modes[k]==='shortage').join(', ');
-    $('set_glassPrice').value=c.glass_price??''; $('set_glassCats').value=(c.glass_categories||[]).join(', ');
-    $('set_retNotes').value=Object.entries(c.return_notes||{}).map(([k,v])=>`${k}: ${v}`).join('\n'); }
+    $('set_glassPrice').value=c.glass_price??''; $('set_company').value=c.company_name||''; $('set_nip').value=c.nip||''; $('set_address').value=c.address||''; $('set_email').value=c.email||''; $('set_phone').value=c.phone||''; }
 }
 $('set_saveOrg').onclick=async()=>{
   if(!ORG){ toast('Brak organizacji — uruchom update27.sql w Supabase'); return; }
   const split=s=>s.split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
-  const modes={}; split($('set_retOpen').value).forEach(k=>modes[k]='open'); split($('set_retShort').value).forEach(k=>modes[k]='shortage'); CAT_ORDER.forEach(k=>{ if(!modes[k]) modes[k]='whole'; });
-  const notes={}; $('set_retNotes').value.split('\n').forEach(l=>{ const m=l.match(/^\s*([^:]+):\s*(.+)$/); if(m) notes[m[1].trim().toUpperCase()]=m[2].trim(); });
-  const gp=$('set_glassPrice').value===''?null:Number($('set_glassPrice').value);
-  const config=Object.assign({},ORG.config||{},{brand:$('set_brand').value.trim(),cat_order:split($('set_catOrder').value),buy_default:split($('set_buyDefault').value),return_modes:modes,return_notes:notes,glass_price:gp,glass_categories:split($('set_glassCats').value)});
+  const config=Object.assign({},ORG.config||{},{brand:$('set_brand').value.trim(),cat_order:split($('set_catOrder').value),buy_default:split($('set_buyDefault').value),
+    company_name:$('set_company').value.trim(),nip:$('set_nip').value.trim(),address:$('set_address').value.trim(),email:$('set_email').value.trim(),phone:$('set_phone').value.trim()});
+  config.glass_price = $('set_glassPrice').value===''?null:Number($('set_glassPrice').value);   // puste = null, baza bierze swoją domyślną
   await api('PATCH',`orgs?id=eq.${ORG.id}`,{config},'return=minimal'); await loadOrg(); toast('Zapisano organizację');
 };
 async function saveSetting(key,value){ await api('POST','settings',{key,value,updated_at:new Date().toISOString()},'resolution=merge-duplicates,return=minimal'); }

@@ -118,7 +118,8 @@ pre.txt{white-space:pre-wrap;font:inherit;margin:0;line-height:1.5}
     <div class="card"><h2>Pakowanie <span class="pill" id="whProg"></span></h2>
       <div class="bar" style="height:6px;background:var(--card2);border-radius:999px;overflow:hidden;margin:6px 0 10px"><i id="whBar" style="display:block;height:100%;width:0;background:var(--ok)"></i></div>
       <div id="whPack"></div>
-      <a id="whReturn" class="btn" style="display:block;text-align:center;margin-top:12px;text-decoration:none">↩ Zwrot z eventu — co wróciło do magazynu</a></div>
+      <a id="whReturn" class="btn" style="display:block;text-align:center;margin-top:12px;text-decoration:none">↩ Zwrot z eventu — co wróciło do magazynu</a>
+      <a id="whGlass" class="btn" style="display:block;text-align:center;margin-top:8px;text-decoration:none">🥂 Protokół szkła</a></div>
     <div class="card" id="whReserveCard"><h2>Zapas — bierzesz coś poza agendą?</h2>
       <p class="note" style="margin-top:0">Dopisz tu wszystko, co bierzesz ekstra (te same składniki, większa ilość). Schodzi ze stanu jak reszta i wraca przez zwrot — bez tego magazyn się nie zgadza.</p>
       <div id="whReserveList"></div>
@@ -259,11 +260,6 @@ pre.txt{white-space:pre-wrap;font:inherit;margin:0;line-height:1.5}
         <p class="note">Zapisz ten link — wszystko o evencie znajdziesz tutaj. Jak coś się zmieni, dostaniesz wiadomość.</p>
       </div>
 
-      <div class="card hidden" id="retCard">
-        <h2>Po evencie</h2>
-        <p class="note" style="margin:0 0 10px">Tomek włączył Ci rozliczenie zwrotu z tego eventu: przy rozładunku w magazynie wpisz, co wróciło (całe sztuki, braki szkła). Zajmuje kilka minut — większość załatwisz przyciskami przy kategoriach.</p>
-        <a id="retLink" class="btn" style="display:block;text-align:center;text-decoration:none">↩ Zwrot z eventu — co wróciło do magazynu</a>
-      </div>
       <div class="card" id="agendaWait">
         <h2>Agenda</h2>
         <p class="big" style="margin:0">Szczegóły (zbiórka, co spakować, menu) pojawią się tutaj kilka dni przed eventem.</p>
@@ -537,7 +533,7 @@ async function homeFlow(){
           ${e.meeting_time?`<div class="note" style="margin:2px 0 0">Zbiórka: ${esc(e.meeting_time)}</div>`:''}
         </div>
         <div>${stat(e.status)}</div>
-      </div></a>${e.can_return&&e.status==='zaakceptowany'&&e.event_id?`<a class="btn" data-ret="${esc(e.event_id)}" style="display:block;text-align:center;text-decoration:none;margin:-4px 0 12px" href="${location.href.replace(/crew\.html.*$/,'zwrot.html')}?w=${encodeURIComponent(mtoken)}&ev=${encodeURIComponent(e.event_id)}">↩ Zwrot z eventu — co wróciło</a>`:''}`;
+      </div></a>`;
   $('hList').innerHTML=(up.length?up.map(card).join(''):'<p class="note">Na razie brak nadchodzących eventów — Tomek się odezwie.</p>')
     +(past.length?'<p class="note" style="margin:16px 0 8px">Ostatnie eventy:</p>'+past.map(card).join(''):'');
   try{ const W=await rpc('wh_events',{p_mtoken:mtoken}); if(Array.isArray(W)){ $('whList').classList.remove('hidden'); $('whShop').href=location.href.replace(/crew\.html.*$/,'zakupy.html')+'?w='+encodeURIComponent(mtoken);
@@ -566,6 +562,7 @@ function whRender(){
   if(!WH){ $('invalid').classList.remove('hidden'); return; }
   const e=WH.event, ag=WH.agenda, P=WH.packing||[];
   $('wh').classList.remove('hidden'); $('whBack').href='?m='+encodeURIComponent(mtoken); $('whReturn').href=location.href.replace(/crew\.html.*$/,'zwrot.html')+'?w='+encodeURIComponent(mtoken)+'&ev='+encodeURIComponent(whEv);
+  $('whGlass').href=location.href.replace(/crew\.html.*$/,'szklo.html')+'?w='+encodeURIComponent(mtoken)+'&ev='+encodeURIComponent(whEv);
   $('statusPill').textContent='Magazyn'; $('statusPill').className='pill';
   $('whName').textContent=e.name; $('whWhen').textContent=`${fmtDate(e.event_date)}${e.event_end_date&&e.event_end_date!==e.event_date?' → '+fmtDate(e.event_end_date):''} · ${e.start_time||''}${e.end_time?'–'+e.end_time:''}${e.guests?' · '+e.guests+' os.':''}`;
   $('whWhere').textContent=[e.venue,e.address].filter(Boolean).join(', ');
@@ -606,7 +603,6 @@ document.addEventListener('visibilitychange',()=>{ if(!document.hidden && WH){ w
   $('loading').classList.add('hidden');
   if(!D){ $('invalid').classList.remove('hidden'); $('statusPill').textContent='—'; return; }
   $('app').classList.remove('hidden'); render();
-  if(D.assignment && D.assignment.can_return && D.assignment.status==='zaakceptowany' && D.crew && D.crew.my_token && D.event && D.event.id){ $('retCard').classList.remove('hidden'); $('retLink').href=location.href.replace(/crew\.html.*$/,'zwrot.html')+'?w='+encodeURIComponent(D.crew.my_token)+'&ev='+encodeURIComponent(D.event.id); }
   if(D.crew && D.crew.my_token){ const L=$('myEventsLink'); L.href='?m='+encodeURIComponent(D.crew.my_token); L.classList.remove('hidden'); L.style.display='block'; }
 })();
 </script>

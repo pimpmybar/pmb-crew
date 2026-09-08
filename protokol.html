@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Protokół zdawczo-odbiorczy szkła</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#e8e4dc;font-family:Inter,system-ui,-apple-system,sans-serif;color:#1d1c18;-webkit-font-smoothing:antialiased}
+.bar{background:#17171b;color:#f2f0ea;font-size:13px;padding:12px 18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:9}
+.bar b{font-family:'Bebas Neue',Inter,sans-serif;letter-spacing:.05em;font-size:16px}
+.bar .btn{border:1px solid #3a3a44;background:#1f1f25;color:#f2f0ea;border-radius:8px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+.bar .btn.primary{background:#e8b04b;border-color:#e8b04b;color:#151004}
+.wrap{display:flex;justify-content:center;padding:26px 10px 40px}
+.page{width:595px;min-height:842px;padding:40px 46px 32px;background:#fff;box-shadow:0 8px 40px rgba(0,0,0,.25);font-size:12px;line-height:1.5}
+.hd{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;border-bottom:2px solid #1d1c18;padding-bottom:10px}
+.hd .brand{font-family:'Bebas Neue',Inter,sans-serif;font-size:30px;letter-spacing:.06em;line-height:1}
+.hd .co{text-align:right;font-size:10.5px;color:#4a4a44;line-height:1.5}
+h1{font-family:'Bebas Neue',Inter,sans-serif;font-size:24px;letter-spacing:.04em;margin:18px 0 4px;font-weight:400}
+h2{font-family:'Bebas Neue',Inter,sans-serif;font-size:15px;letter-spacing:.06em;margin:18px 0 6px;font-weight:400;color:#8a6a1e}
+.meta{font-size:11.5px;color:#3d3c38}
+.meta b{color:#1d1c18}
+table{width:100%;border-collapse:collapse;margin-top:6px;font-size:11.5px}
+th,td{border-bottom:1px solid #ded9cd;padding:6px 6px;text-align:right}
+th:first-child,td:first-child{text-align:left}
+thead th{border-bottom:1.5px solid #1d1c18;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#4a4a44}
+tfoot td{font-weight:700;border-bottom:0;border-top:1.5px solid #1d1c18;padding-top:8px}
+.sum{margin-top:12px;display:flex;justify-content:space-between;gap:14px;background:#f6f3ec;border:1px solid #e2ddd0;border-radius:10px;padding:10px 12px}
+.sum .big{font-family:'Bebas Neue',Inter,sans-serif;font-size:24px;letter-spacing:.03em;line-height:1}
+.sigs{display:flex;gap:18px;margin-top:22px}
+.sigbox{flex:1;border:1px solid #ded9cd;border-radius:10px;padding:10px}
+.sigbox .lab{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#6d6c64;margin-bottom:6px}
+.sigbox img{display:block;width:100%;max-height:90px;object-fit:contain;background:#fff}
+.sigbox .who{margin-top:6px;font-size:11px}
+.sigbox .who b{display:block}
+.foot{margin-top:20px;padding-top:10px;border-top:1px solid #ded9cd;font-size:10px;color:#6d6c64;line-height:1.5}
+.msg{padding:60px 20px;text-align:center;color:#6d6c64;font-size:14px}
+@page{size:A4 portrait;margin:12mm}
+@media print{
+  .bar{display:none!important}
+  html,body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .wrap{padding:0}
+  .page{width:auto;min-height:0;box-shadow:none!important;padding:0}
+}
+@media (max-width:640px){ .page{width:100%;padding:22px 18px} .sigs{flex-direction:column} }
+</style>
+</head>
+<body>
+<div class="bar"><b>PROTOKÓŁ SZKŁA</b><span style="flex:1"></span><button class="btn primary" id="printBtn">🖨 Drukuj / PDF</button></div>
+<div class="wrap"><div class="page" id="doc"><p class="msg">Ładuję…</p></div></div>
+<script src="pmb-core.js"></script>
+<script>
+const TOK=new URLSearchParams(location.search).get('p');
+document.getElementById('printBtn').onclick=()=>window.print();
+const money=n=>n==null?'—':fmtN(Math.round(Number(n)*100)/100)+' zł';
+const dt=s=>s?new Date(s).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+const dd=s=>s?new Date(s+'T00:00:00').toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+
+function sigBox(lab, s, who){
+  if(!s) return '';
+  return `<div class="sigbox"><div class="lab">${esc(lab)}</div>
+    ${s.signature_data?`<img src="${esc(s.signature_data)}" alt="podpis">`:'<div style="height:60px"></div>'}
+    <div class="who"><b>${esc(who)}</b>${s.signed_at?dt(s.signed_at):''}</div></div>`;
+}
+// pozycje puste (zero wydane, zero zwrócone, zero strat) tylko zaśmiecają dokument organizatora
+function rows(d){
+  const z=d.zwrot, w=d.wydanie;
+  if(z) return (z.items||[]).filter(i=>Number(i.issued||0)||Number(i.returned||0)||Number(i.loss||0)).map(i=>`<tr><td>${esc(i.name)}</td><td>${fmtN(i.issued)}</td><td>${fmtN(i.returned)}</td><td>${fmtN(i.loss)}</td><td>${money(Number(i.loss||0)*Number(d.price_per_item||0))}</td></tr>`).join('');
+  return ((w&&w.items)||[]).filter(i=>Number(i.qty||0)).map(i=>`<tr><td>${esc(i.name)}</td><td>${fmtN(i.qty)}</td></tr>`).join('');
+}
+function render(d){
+  const o=d.org||{}, e=d.event||{}, w=d.wydanie, z=d.zwrot;
+  const co=[o.company_name, o.address, o.nip?'NIP '+o.nip:'', o.phone, o.email].filter(Boolean).map(esc).join('<br>');
+  const date=[dd(e.event_date)+(e.event_end_date&&e.event_end_date!==e.event_date?' – '+dd(e.event_end_date):''), e.venue].filter(Boolean).map(esc).join(' · ');
+  const lossQty=z?(z.items||[]).reduce((s,i)=>s+Number(i.loss||0),0):0;
+  const amount=z?(z.loss_amount!=null?Number(z.loss_amount):lossQty*Number(d.price_per_item||0)):null;
+  const pay = !z ? '' : z.payment_method==='gotowka' ? 'gotówka — odebrano '+money(z.payment_amount)
+    : z.payment_method==='faktura' ? 'faktura'+(z.invoice_data&&z.invoice_data.nip?' · NIP '+esc(z.invoice_data.nip):'')+(z.invoice_data&&z.invoice_data.name?' · '+esc(z.invoice_data.name):'')+(z.invoice_data&&z.invoice_data.address?' · '+esc(z.invoice_data.address):'')
+    : 'brak strat do rozliczenia';
+  const org=(z&&z.organizer_name)||(w&&w.organizer_name)||'';
+  const phone=(z&&z.organizer_phone)||(w&&w.organizer_phone)||'';
+  document.getElementById('doc').innerHTML=`
+    <div class="hd"><div class="brand">${esc(o.brand||'')}</div><div class="co">${co}</div></div>
+    <h1>Protokół zdawczo-odbiorczy szkła</h1>
+    <p class="meta"><b>${esc(e.name||'')}</b>${date?' · '+date:''}</p>
+    <p class="meta">Organizator: <b>${esc(org)}</b>${phone?' · '+esc(phone):''}</p>
+    <h2>Pozycje</h2>
+    <table><thead><tr><th>Pozycja</th><th>Wydano</th>${z?'<th>Zwrócono</th><th>Straty</th><th>Kwota</th>':''}</tr></thead>
+      <tbody id="docRows">${rows(d)}</tbody>
+      ${z?`<tfoot><tr><td>Razem</td><td></td><td></td><td>${fmtN(lossQty)}</td><td>${money(amount)}</td></tr></tfoot>`:''}
+    </table>
+    <div class="sum">
+      <div><div class="meta">Stawka za sztukę</div><div class="big">${money(d.price_per_item)}</div></div>
+      <div style="text-align:right"><div class="meta">${z?'Kwota strat':'Protokół zwrotu jeszcze niepodpisany'}</div><div class="big">${z?money(amount):'—'}</div></div>
+    </div>
+    ${z?`<p class="meta" style="margin-top:10px">Forma rozliczenia: <b>${pay}</b>${z.settled_at?' · rozliczono '+dt(z.settled_at):''}</p>`:''}
+    <div class="sigs">
+      ${sigBox('Wydanie · podpis organizatora', w, (w&&w.organizer_name)||'')}
+      ${sigBox('Zwrot · podpis organizatora', z, (z&&z.organizer_name)||'')}
+    </div>
+    <p class="meta" style="margin-top:10px">w imieniu ${esc(o.brand||'')}: <b>${esc((z&&z.crew_name)||(w&&w.crew_name)||'')}</b></p>
+    <p class="foot">Straty rozliczane wg stawki za sztukę uzgodnionej przy wydaniu.</p>`;
+}
+async function load(){
+  let d=null;
+  if(TOK){ try{ d=await rpc('glass_protocol_public',{p_token:TOK}); }catch(e){ d=null; } }
+  if(!d||!d.event){ document.getElementById('doc').innerHTML='<p class="msg">Nie znaleziono protokołu. Sprawdź, czy link jest kompletny.</p>'; return; }
+  render(d);
+}
+load();
+</script>
+</body>
+</html>
