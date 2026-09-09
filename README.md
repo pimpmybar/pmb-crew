@@ -10,7 +10,7 @@ Statyczne strony HTML + Supabase. Bez frameworka, bez kroku budowania.
 - `schema.sql` — pełny schemat bazy w stanie po update26 (zrzut z produkcji 01.09.2026; oryginalne update1–26 przepadły)
 - `update27.sql` … `update30.sql` — kolejne migracje, uruchamiane po kolei w Supabase → SQL Editor; `updateNN_rollback.sql` (np. `update29_rollback.sql`) — cofnięcie danej migracji (nie są migracjami, poligon je pomija)
 - `szklo.html`, `protokol.html` — protokół szkła (od update29, opis niżej)
-- `intake/Code.gs` — Apps Script arkusza z odpowiedziami formularza „Dane do umowy" (od update30, opis niżej)
+- `intake/PmbImport.gs` — Apps Script arkusza z odpowiedziami formularza „Dane do umowy" (od update30, opis niżej)
 - `db/test/` — lokalny poligon migracji (Postgres 16)
 - `testNN.mjs` — testy Playwright (mockowane REST)
 - `docs/superpowers/specs/` — architektura; `docs/superpowers/plans/` — plany wdrożeń
@@ -56,10 +56,10 @@ Skrypt arkusza wysyła każdy wiersz do bazy (`event_intake`), a event pojawia s
 „z formularza" — właściciel go sprawdza i potwierdza. Wdrożenie:
 1. Supabase → SQL Editor → `update30.sql` → Run (dodaje `events.intake_id/intake_at/client_email`, klucz `intake_key` w `settings`
    i funkcję `event_intake`). Cofnięcie: `update30_rollback.sql`.
-2. Arkusz → Rozszerzenia → Apps Script → wklej `intake/Code.gs`; Ustawienia projektu → Właściwości skryptu →
-   `INTAKE_KEY` = wartość z panelu (Ustawienia → „Klucz importu z formularza", przycisk Kopiuj); uruchom raz `setup()`
+2. Arkusz → Rozszerzenia → Apps Script → w istniejącym projekcie dodaj NOWY plik (Pliki → + → Skrypt) o nazwie PmbImport i wklej `intake/PmbImport.gs` (istniejącego skryptu umów nie ruszaj); Ustawienia projektu → Właściwości skryptu →
+   `INTAKE_KEY` = wartość z panelu (Ustawienia → „Klucz importu z formularza", przycisk Kopiuj); uruchom raz `pmbSetup()`
    i zatwierdź uprawnienia (zakłada wyzwalacz „przy przesłaniu formularza").
-3. Zaległe wiersze (opcjonalnie): otwórz zakładkę w arkuszu i uruchom `importSheet()` — wyśle wiersze bez wpisu w kolumnie
+3. Zaległe wiersze (opcjonalnie): otwórz zakładkę w arkuszu i uruchom `pmbImportSheet()` — wyśle wiersze bez wpisu w kolumnie
    `PMB import`. Kolumna ta (dopisywana na końcu nagłówków) trzyma wynik: `created|exists|linked <id>` albo treść błędu.
 
 Duplikaty: `intake_id` = `sygnatura czasowa|adres e-mail` z unikalnym indeksem per organizacja. Ponowne wysłanie tego samego
