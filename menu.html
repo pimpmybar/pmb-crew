@@ -38,7 +38,7 @@ svg.corner{position:absolute;width:50px;height:50px;opacity:.5}
 
 <script src="pmb-core.js"></script>
 <script>
-const Q=new URLSearchParams(location.search), evId=Q.get('id'), token=Q.get('t');
+const Q=new URLSearchParams(location.search), evId=Q.get('id'), token=Q.get('t'), whTok=Q.get('w'), whEv=Q.get('ev');
 
 /* ===== BIBLIOTEKA PMB (z Menu Buildera v13) ===== */
 const LIB=[
@@ -98,21 +98,54 @@ const IDX={}; { const put=(k,d)=>{ if(k&&!IDX[k]) IDX[k]=d; }; LIB.forEach(d=>pu
 
 /* ===== PARSOWANIE MENU EVENTU ===== */
 const SKIP=/^(umowa|welcome|koktajl|menu|alkoholowe|bezalkoholowe|coffee|kubek|lód|lod|batch|piwo|frizzante|\*|serwis|cytryny|na start)/i;
+// nagłówki/pozycje z umowy, które nie są drinkami
+const SKIP2=/^(alkohole|asortyment|lód|lod|szkło|szklo|razem|obsługa|obsluga|transfer)\b/i;
+// znacznik listy na początku wiersza: "- ", "* ", "1. ", "7.\t"
+const MARK=/^\s*(?:[-*•‣–—]\s+|\d+[.)][ \t]*)/;
+// ilość: "20 szt.", "51 szt", "(30 szt.)", "x 30"
+const QTY=/\s*[(–—-]?\s*(?:\d+\s*(?:szt|x|×|porcj)|[x×]\s*\d+)/i;
+// warianty bezalkoholowe — do wykrycia i do wycięcia z nazwy
+const ZERO_SRC='\\(\\s*non[\\s-]?alco[^)]*\\)|\\bnon[\\s-]?alco\\w*|\\bbezalko\\w*|\\bvirgin\\b|\\bzero\\b|\\b0\\s*%';
+const zeroRe=()=>new RegExp(ZERO_SRC,'gi');
+// alkohole do usunięcia ze składu przy robieniu wersji 0%
+const ALCO=/wódk|wodk|vodka|\bgin\b|\brum\b|whisk|bourbon|prosecco|tequil|likier|aperol|campari/i;
+const stripAlco=ing=>String(ing||'').split(',').map(s=>s.trim()).filter(s=>s&&!ALCO.test(s)).join(', ');
+const titleIfCaps=s=>/[a-ząćęłńóśźż]/.test(s)?s:s.toLowerCase().replace(/(^|[\s-])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase());
+// nazwa bazowa wariantu 0% ("HUGO virgin" -> "Hugo", "Mojito Virgin ( non alco )" -> "Mojito")
+function zeroBase(nm){ return String(nm).replace(zeroRe(),' ').replace(/\s+/g,' ').replace(/[\s.,;:–—-]+$/,'').trim(); }
+
+/* Czysta funkcja: wiersz umowy -> {name, isMock, base} albo null gdy to nie jest drink. */
+function normHead(line){
+  let s=String(line||'').trim(); if(!s) return null;
+  s=s.replace(MARK,'').trim(); if(!s) return null;
+  if(SKIP.test(s)||SKIP2.test(s)||/^[\d\s.,%]+$/.test(s)) return null;
+  let head=s.split(/\s+[—–]\s+|\s+-\s+|\s+·\s+/)[0].trim();
+  const q=head.search(QTY); if(q>0) head=head.slice(0,q);
+  head=head.replace(/\s+/g,' ').replace(/[\s.,;:–—-]+$/,'').trim();
+  if(!head||head.length>44) return null;
+  const isMock=zeroRe().test(head)||/bezalko/i.test(s);
+  return {name:head, isMock, base: isMock?zeroBase(head):head};
+}
+
 function parseMenu(txt){
   const found=[], seen=new Set();
-  const add=(d,mock)=>{ const k=norm(d.name); if(seen.has(k))return; seen.add(k); found.push({...d, mock: mock||d.mock||false}); };
+  const add=(d,mock)=>{ mock=!!mock; const k=norm(d.name)+'|'+(mock?1:0); if(seen.has(k))return; seen.add(k); found.push({...d, mock}); };
   (txt||'').split(/\n+/).forEach(line=>{
-    line=line.trim(); if(!line||SKIP.test(line)) return;
-    // nazwa = to co przed — / – / "- " / "·"
-    let head=line.split(/\s+[—–]\s+|\s+-\s+|\s+·\s+/)[0].trim();
-    if(!head||head.length>44) return;
+    const h=normHead(line); if(!h) return;
     // "Whisky Sour / Old Fashioned" -> dwa drinki
-    head.split(/\s*\/\s*/).forEach(nm=>{
+    h.name.split(/\s*\/\s*/).forEach(nm=>{
       nm=nm.trim(); if(!nm) return;
-      const isMock=/0\s*%/.test(nm)||/bezalk/i.test(line);
-      const hit=IDX[norm(nm)];
-      if(hit) add(hit, hit.mock||isMock&&false); // przy wersjach alk+0% pokazujemy jedną pozycję
-      else if(/^[A-ZĄĆĘŁŃÓŚŹŻ]/.test(nm)&&!/\d/.test(nm)&&nm.length>=4) add({name:nm,ing:'',desc:''});
+      if(h.isMock){
+        const base=zeroBase(nm); if(!base) return;
+        const hit=IDX[norm('virgin '+base)]||IDX[norm(base+' virgin')]||IDX[norm(base+' zero')]||IDX[norm(base)];
+        const nazwa=titleIfCaps(base)+' Zero';
+        if(hit) add({...hit, name:nazwa, ing: hit.mock?hit.ing:stripAlco(hit.ing)}, true);
+        else if(/^[\p{Lu}]/u.test(base)&&!/\d/.test(base)&&base.length>=3) add({name:nazwa,ing:'',desc:''}, true);
+      } else {
+        const hit=IDX[norm(nm)];
+        if(hit) add(hit, hit.mock);
+        else if(/^[\p{Lu}]/u.test(nm)&&!/\d/.test(nm)&&nm.length>=4) add({name:nm,ing:'',desc:''}, false);
+      }
     });
   });
   return found;
@@ -136,7 +169,7 @@ function render(){
   const n=items.length, dense=n>10;
   const nameSize=dense?'12px':'15.5px', ingSize=dense?'8px':'8.5px', descSize=dense?'9px':'9.5px', itemPad=dense?'6px':'11px', titleSize=dense?'30px':'36px';
   const item=d=>{
-    const mock=d.mock?`<span style="display:inline-block;font-size:7.5px;background:#000;color:#fff;padding:1px 5px;border-radius:3px;margin-left:5px;vertical-align:2px;font-style:normal;letter-spacing:.06em;font-weight:600;font-family:Arial,sans-serif;">MOCKTAIL</span>`:'';
+    const mock=d.mock?`<span style="display:inline-block;font-size:7.5px;background:#000;color:#fff;padding:1px 5px;border-radius:3px;margin-left:5px;vertical-align:2px;font-style:normal;letter-spacing:.06em;font-weight:600;font-family:Arial,sans-serif;">0%</span>`:'';
     return `<div style="padding:${itemPad} 0;border-bottom:.5px solid ${S.line};">
       <div style="font-size:${nameSize};font-weight:600;text-transform:uppercase;letter-spacing:.08em;font-family:${S.titleFont};color:${S.text};margin-bottom:3px;">${esc(d.name)}${mock}</div>
       ${d.ing?`<div style="font-size:${ingSize};text-transform:uppercase;letter-spacing:.07em;color:${S.ing};font-family:${S.bodyFont};margin-bottom:3px;">${esc(d.ing)}</div>`:''}
@@ -176,7 +209,11 @@ function toggles(){
   await loadLib();
   try{
     let menuTxt='', label='';
-    if(token){
+    if(whTok&&whEv){
+      const d=await rpc('wh_event',{p_mtoken:whTok,p_event:whEv});
+      if(!d||!d.event){ $('loading').textContent='Brak dostępu.'; return; }
+      menuTxt=(d.agenda&&d.agenda.menu)||''; label=`${d.event.name} · ${d.event.event_date}`;
+    } else if(token){
       const d=await rpc('crew_get',{p_token:token}); if(d&&d.org) applyBrand(d.org.brand);
       if(!d||!d.agenda){ $('loading').textContent='Menu będzie dostępne po akceptacji eventu.'; return; }
       menuTxt=d.agenda.menu||''; label=`${d.event.name} · ${d.event.event_date}`;

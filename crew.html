@@ -126,7 +126,9 @@ pre.txt{white-space:pre-wrap;font:inherit;margin:0;line-height:1.5}
       <div style="display:flex;gap:8px;margin-top:10px"><input id="whResQ" placeholder="szukaj w katalogu…" autocomplete="off" style="flex:1"><input id="whResQty" type="number" inputmode="decimal" step="any" min="0" placeholder="ile" style="width:80px"></div>
       <div id="whResHits" style="margin-top:6px"></div>
     </div>
-    <div class="card" id="whMenuCard"><h2>Menu / receptury</h2><pre class="txt" id="whMenu"></pre></div>
+    <div class="card" id="whMenuCard"><h2>Menu / receptury</h2><pre class="txt" id="whMenu"></pre>
+      <p class="note" style="margin-top:8px">Ilości w menu = ilości z umowy; zapas dopisujesz w karcie „Zapas” powyżej.</p>
+      <a id="whMenuPrint" class="btn" style="display:block;text-align:center;margin-top:8px;text-decoration:none">🖨 Menu do druku (dla klienta)</a></div>
     <div class="card" id="whNotesCard"><h2>Uwagi</h2><div id="whNotes" class="note" style="line-height:1.6"></div></div>
   </div>
 
@@ -563,6 +565,7 @@ function whRender(){
   const e=WH.event, ag=WH.agenda, P=WH.packing||[];
   $('wh').classList.remove('hidden'); $('whBack').href='?m='+encodeURIComponent(mtoken); $('whReturn').href=location.href.replace(/crew\.html.*$/,'zwrot.html')+'?w='+encodeURIComponent(mtoken)+'&ev='+encodeURIComponent(whEv);
   $('whGlass').href=location.href.replace(/crew\.html.*$/,'szklo.html')+'?w='+encodeURIComponent(mtoken)+'&ev='+encodeURIComponent(whEv);
+  $('whMenuPrint').href=location.href.replace(/crew\.html.*$/,'menu.html')+'?w='+encodeURIComponent(mtoken)+'&ev='+encodeURIComponent(whEv);
   $('statusPill').textContent='Magazyn'; $('statusPill').className='pill';
   $('whName').textContent=e.name; $('whWhen').textContent=`${fmtDate(e.event_date)}${e.event_end_date&&e.event_end_date!==e.event_date?' → '+fmtDate(e.event_end_date):''} · ${e.start_time||''}${e.end_time?'–'+e.end_time:''}${e.guests?' · '+e.guests+' os.':''}`;
   $('whWhere').textContent=[e.venue,e.address].filter(Boolean).join(', ');
