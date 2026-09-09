@@ -138,7 +138,9 @@ function parseMenu(txt){
     const h=normHead(line); if(!h) return;
     if(zeroSection&&!h.isMock){ h.isMock=true; h.base=zeroBase(h.name)||h.name; }
     // "Whisky Sour / Old Fashioned" -> dwa drinki
-    h.name.split(/\s*\/\s*/).forEach(nm=>{
+    // „Caipi (mango / truskawka)” — ukośnik w nawiasie to warianty jednego drinka, nie dwa drinki
+    const parts=/\(/.test(h.name)?[h.name.replace(/\(([^)]*)$/,'($1)').replace(/\(\s*\)$/,'').trim()]:h.name.split(/\s*\/\s*/);
+    parts.forEach(nm=>{
       nm=nm.trim(); if(!nm) return;
       if(h.isMock){
         const base=zeroBase(nm); if(!base) return;
@@ -147,8 +149,9 @@ function parseMenu(txt){
         if(hit) add({...hit, name:nazwa, ing: hit.mock?hit.ing:stripAlco(hit.ing)}, true);
         else if(/^[\p{Lu}]/u.test(base)&&!/\d/.test(base)&&base.length>=3) add({name:nazwa,ing:'',desc:''}, true);
       } else {
-        const hit=IDX[norm(nm)];
-        if(hit) add(hit, hit.mock);
+        const bare=nm.replace(/\s*\([^)]*\)\s*/g,' ').trim();   // nazwa bez nawiasu do dopasowania receptury
+        const hit=IDX[norm(nm)]||IDX[norm(bare)];
+        if(hit) add({...hit, name: bare===nm?hit.name:nm}, hit.mock);
         else if(/^[\p{Lu}]/u.test(nm)&&!/\d/.test(nm)&&nm.length>=4) add({name:nm,ing:'',desc:''}, false);
       }
     });
