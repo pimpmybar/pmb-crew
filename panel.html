@@ -479,6 +479,11 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
         <p class="muted" style="margin-top:0">Osoba z tym linkiem widzi tylko listę pozycji i wpisuje stany (z podpisem imieniem) oraz może zapisać remanent do historii. Nie widzi eventów, stawek ani kwot. Jeśli link wyciekł — wygeneruj nowy, stary przestanie działać.</p>
         <div style="display:flex;gap:8px;align-items:center"><input id="set_stock" readonly style="flex:1"><button class="btn sm" id="set_stockCopy">Kopiuj</button><button class="btn sm danger" id="set_stockNew">Nowy link</button></div>
       </div>
+      <div class="card">
+        <h2>Klucz importu z formularza umowy</h2>
+        <p class="muted" style="margin-top:0">Wpisz go w Apps Script arkusza „EVENTY PIMP MY BAR" (Ustawienia projektu → Właściwości skryptu → <span class="mono">INTAKE_KEY</span>). Nowe wpisy z formularza pojawią się na liście eventów jako wstępne, z plakietką „z formularza".</p>
+        <div style="display:flex;gap:8px;align-items:center"><input id="set_intake" readonly style="flex:1"><button class="btn sm" id="set_intakeCopy">Kopiuj</button></div>
+      </div>
     </div>
   </div>
 </div>
@@ -606,7 +611,7 @@ $('viewList').onclick=()=>{ $('evList').classList.remove('hidden'); $('evCal').c
 $('viewCal').onclick=()=>{ $('evList').classList.add('hidden'); $('evCal').classList.remove('hidden'); document.querySelector('.cols').classList.add('wide'); $('viewCal').style.fontWeight='700'; $('viewList').style.fontWeight=''; if(cur){ calY=+cur.event_date.slice(0,4); calM=+cur.event_date.slice(5,7)-1; } renderCal(); };
 
 function renderEvList(){
-  $('evList').innerHTML = events.map(e=>`<div class="evitem ${cur&&cur.id===e.id?'on':''}" data-id="${e.id}"><b>${esc(e.name)}</b><small>${e.event_date}${endOf(e)!==e.event_date?' → '+endOf(e).slice(5):''} · <span class="pill ${STATUS[e.status]?.[1]||''}">${STATUS[e.status]?.[0]||e.status}</span> ${pctPill(e)}${carsOf(e).length?' · '+carsOf(e).join('+'):''}${carConflicts(e).length?' <span class="pill bad">kolizja auta</span>':''}${GLASS_TODO.has(e.id)?' <span class="pill warn">szkło do rozliczenia</span>':''}${GLASS_NORET.has(e.id)?' <span class="pill bad">szkło bez zwrotu</span>':''}</small></div>`).join('') || '<div class="muted">Brak eventów</div>';
+  $('evList').innerHTML = events.map(e=>`<div class="evitem ${cur&&cur.id===e.id?'on':''}" data-id="${e.id}"><b>${esc(e.name)}</b><small>${e.event_date}${endOf(e)!==e.event_date?' → '+endOf(e).slice(5):''} · <span class="pill ${STATUS[e.status]?.[1]||''}">${STATUS[e.status]?.[0]||e.status}</span> ${pctPill(e)}${carsOf(e).length?' · '+carsOf(e).join('+'):''}${carConflicts(e).length?' <span class="pill bad">kolizja auta</span>':''}${GLASS_TODO.has(e.id)?' <span class="pill warn">szkło do rozliczenia</span>':''}${GLASS_NORET.has(e.id)?' <span class="pill bad">szkło bez zwrotu</span>':''}${e.intake_id&&e.status==='wstepny'?' <span class="pill warn">z formularza</span>':''}</small></div>`).join('') || '<div class="muted">Brak eventów</div>';
   document.querySelectorAll('.evitem').forEach(el=>el.onclick=()=>openEvent(el.dataset.id));
 }
 async function loadEvents(){
@@ -1292,6 +1297,8 @@ async function loadSettings(){
   $('set_stockCopy').onclick=()=>{ if(S.stock_key){ navigator.clipboard.writeText(stockLink); toast('Link skopiowany'); } };
   $('set_stockNew').onclick=async()=>{ if(!confirm('Wygenerować nowy link do remanentu? Stary przestanie działać.')) return; const k=[...crypto.getRandomValues(new Uint8Array(8))].map(b=>b.toString(16).padStart(2,'0')).join(''); await saveSetting('stock_key',k); toast('Nowy link gotowy'); loadSettings(); };
   $('set_recruitCopy').onclick=()=>{ navigator.clipboard.writeText(link); toast('Link skopiowany'); };
+  $('set_intake').value=S.intake_key||'uruchom update30.sql w Supabase';
+  $('set_intakeCopy').onclick=()=>{ if(S.intake_key){ navigator.clipboard.writeText(S.intake_key); toast('Klucz skopiowany'); } };
   if(ORG){ const c=ORG.config||{}; $('set_brand').value=c.brand||ORG.name||''; $('set_catOrder').value=CAT_ORDER.join(', '); $('set_buyDefault').value=[...BUY_DEFAULT].join(', ');
     $('set_glassPrice').value=c.glass_price??''; $('set_company').value=c.company_name||''; $('set_nip').value=c.nip||''; $('set_address').value=c.address||''; $('set_email').value=c.email||''; $('set_phone').value=c.phone||''; }
 }

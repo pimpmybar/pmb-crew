@@ -8,8 +8,9 @@ Statyczne strony HTML + Supabase. Bez frameworka, bez kroku budowania.
 - `crew.html`, `agenda.html`, `menu.html`, `remanent.html`, `zakupy.html`, `zwrot.html` — strony dla ekipy (dostęp po tokenie w linku)
 - `pmb-core.js` — wspólny rdzeń (sesja, `api()`, `rpc()`, formatowanie, marka) — ładowany przez każdą stronę
 - `schema.sql` — pełny schemat bazy w stanie po update26 (zrzut z produkcji 01.09.2026; oryginalne update1–26 przepadły)
-- `update27.sql` … `update29.sql` — kolejne migracje, uruchamiane po kolei w Supabase → SQL Editor; `updateNN_rollback.sql` (np. `update29_rollback.sql`) — cofnięcie danej migracji (nie są migracjami, poligon je pomija)
+- `update27.sql` … `update30.sql` — kolejne migracje, uruchamiane po kolei w Supabase → SQL Editor; `updateNN_rollback.sql` (np. `update29_rollback.sql`) — cofnięcie danej migracji (nie są migracjami, poligon je pomija)
 - `szklo.html`, `protokol.html` — protokół szkła (od update29, opis niżej)
+- `intake/Code.gs` — Apps Script arkusza z odpowiedziami formularza „Dane do umowy" (od update30, opis niżej)
 - `db/test/` — lokalny poligon migracji (Postgres 16)
 - `testNN.mjs` — testy Playwright (mockowane REST)
 - `docs/superpowers/specs/` — architektura; `docs/superpowers/plans/` — plany wdrożeń
@@ -48,6 +49,24 @@ Szkło rozlicza osobny, podpisany protokół — nie zwrot z eventu (tam szkło 
 - Szkła nie da się oddać ręcznym zwrotem z eventu (`wh_return_set` odrzuca je błędem `glass`) — jedyną drogą jest protokół.
 - **Kolejność wdrożenia update29:** najpierw strony (`szklo.html`, `protokol.html`, `crew.html`, `zwrot.html`, `panel.html`), potem `update29.sql` w Supabase. Link „Protokół szkła” u ekipy zadziała dopiero po migracji.
 - `orgs.config`: `glass_price` (domyślna stawka zł/szt., nadpisywana per event przez `events.glass_price`), `glass_categories` (kategorie katalogu liczone jako szkło), dane firmy na protokół — `company_name`, `nip`, `address`, `email`, `phone`. Wszystko edytowalne w Ustawieniach.
+
+## Import z formularza umowy (od update30)
+Formularz Google „Dane do umowy" zapisuje odpowiedzi w arkuszu „EVENTY PIMP MY BAR" (osobna zakładka na rodzaj usługi).
+Skrypt arkusza wysyła każdy wiersz do bazy (`event_intake`), a event pojawia się w panelu jako **wstępny** z plakietką
+„z formularza" — właściciel go sprawdza i potwierdza. Wdrożenie:
+1. Supabase → SQL Editor → `update30.sql` → Run (dodaje `events.intake_id/intake_at/client_email`, klucz `intake_key` w `settings`
+   i funkcję `event_intake`). Cofnięcie: `update30_rollback.sql`.
+2. Arkusz → Rozszerzenia → Apps Script → wklej `intake/Code.gs`; Ustawienia projektu → Właściwości skryptu →
+   `INTAKE_KEY` = wartość z panelu (Ustawienia → „Klucz importu z formularza", przycisk Kopiuj); uruchom raz `setup()`
+   i zatwierdź uprawnienia (zakłada wyzwalacz „przy przesłaniu formularza").
+3. Zaległe wiersze (opcjonalnie): otwórz zakładkę w arkuszu i uruchom `importSheet()` — wyśle wiersze bez wpisu w kolumnie
+   `PMB import`. Kolumna ta (dopisywana na końcu nagłówków) trzyma wynik: `created|exists|linked <id>` albo treść błędu.
+
+Duplikaty: `intake_id` = `sygnatura czasowa|adres e-mail` z unikalnym indeksem per organizacja. Ponowne wysłanie tego samego
+wiersza zwraca `exists` i niczego nie zmienia (uzupełni tylko pusty link do umowy). Jeśli event był już wpisany ręcznie —
+ta sama data i ten sam klient — wiersz się do niego **podpina** (`linked`): dostaje sygnaturę, e-mail i link do umowy,
+a pozostałe pola zostają nietknięte. Nagłówki czytane są tolerancyjnie (po początku, bez względu na wielkość liter i spacje),
+daty w formatach `YYYY-MM-DD`, `DD.MM.YYYY`, `DD/MM/YYYY`, godziny sprowadzane do `HH:MM`.
 
 ## Kopia repo
 Sesje Claude nie trzymają plików między uruchomieniami. Po każdej sesji zapisz `pmb-crew.bundle`
