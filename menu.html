@@ -124,9 +124,11 @@ function normHead(line){
   let head=s.split(/\s+[—–]\s+|\s+-\s+|\s+·\s+/)[0].trim();
   const q=head.search(QTY); if(q>0) head=head.slice(0,q);
   head=head.replace(/\s+/g,' ').replace(/[\s.,;:–—-]+$/,'').trim();
-  if(!head||head.length>44) return null;
+  // własna nazwa na karcie: „Jeżynowa Frakcja = Bramble” — drukuje się nazwa z lewej, receptura i opis z prawej
+  let disp=null; const eq=head.match(/^(.+?)\s+=\s+(.+)$/); if(eq){ disp=eq[1].trim(); head=eq[2].trim(); }
+  if(!head||head.length>44||(disp&&disp.length>44)) return null;
   const isMock=zeroRe().test(head)||/bezalko/i.test(s);
-  return {name:head, isMock, base: isMock?zeroBase(head):head};
+  return {name:head, isMock, base: isMock?zeroBase(head):head, disp};
 }
 
 function parseMenu(txt){
@@ -150,14 +152,14 @@ function parseMenu(txt){
       if(h.isMock){
         const base=zeroBase(nm); if(!base) return;
         const hit=IDX[norm('virgin '+base)]||IDX[norm(base+' virgin')]||IDX[norm(base+' zero')]||IDX[norm(base)];
-        const nazwa=titleIfCaps(base)+' Zero';
+        const nazwa=h.disp||titleIfCaps(base)+' Zero';
         if(hit) add({...hit, name:nazwa, ing: hit.mock?hit.ing:stripAlco(hit.ing)}, true);
         else if(/^[\p{Lu}]/u.test(base)&&!/\d/.test(base)&&base.length>=3) add({name:nazwa,ing:'',desc:''}, true);
       } else {
         const bare=nm.replace(/\s*\([^)]*\)\s*/g,' ').trim();   // nazwa bez nawiasu do dopasowania receptury
         const hit=IDX[norm(nm)]||IDX[norm(bare)];
-        if(hit) add({...hit, name: bare===nm?hit.name:nm}, hit.mock);
-        else if(/^[\p{Lu}]/u.test(nm)&&!/\d/.test(nm)&&nm.length>=4) add({name:nm,ing:'',desc:''}, false);
+        if(hit) add({...hit, name: h.disp||(bare===nm?hit.name:nm)}, hit.mock);
+        else if(/^[\p{Lu}]/u.test(nm)&&!/\d/.test(nm)&&nm.length>=4) add({name:h.disp||nm,ing:'',desc:''}, false);
       }
     });
   });
