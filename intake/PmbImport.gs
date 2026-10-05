@@ -20,12 +20,29 @@ function intakeKey_() {
   return k;
 }
 
+/* Strefa czasowa arkusza (nie skryptu) — w niej arkusz buduje obiekty Date dla komórek z godziną. */
+var sheetTz_ = null;
+function sheetTz() {
+  if (!sheetTz_) {
+    try { sheetTz_ = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(); } catch (e) {}
+    if (!sheetTz_) sheetTz_ = TZ;
+  }
+  return sheetTz_;
+}
+
 /* Wartość komórki jako tekst. Daty i godziny arkusz podaje jako obiekt Date
-   (komórka z godziną to Date na 1899-12-30), więc formatujemy je sami. */
-function cell_(v) {
+   (komórka z godziną to Date na 1899-12-30), więc formatujemy je sami.
+   disp = tekst widoczny w komórce (getDisplayValues). Dla godzin bierzemy właśnie jego: Date z 1899 r.
+   przeliczany między strefami dostaje historyczne przesunięcie (LMT, Warszawa +1:24) i godzina
+   wychodziła przesunięta o +1:14. Bez disp formatujemy w strefie arkusza, nie w TZ. */
+function cell_(v, disp) {
   if (v === null || v === undefined) return '';
   if (Object.prototype.toString.call(v) === '[object Date]') {
-    if (v.getFullYear() < 1900) return Utilities.formatDate(v, TZ, 'HH:mm');            // godzina: Date na 1899-12-30
+    if (v.getFullYear() < 1900) {                                                        // godzina: Date na 1899-12-30
+      var m = /(\d{1,2}):(\d{2})/.exec(String(disp || ''));
+      if (m) return ('0' + m[1]).slice(-2) + ':' + m[2];
+      return Utilities.formatDate(v, sheetTz(), 'HH:mm');
+    }
     var midnight = v.getHours() === 0 && v.getMinutes() === 0 && v.getSeconds() === 0;
     return Utilities.formatDate(v, TZ, midnight ? 'yyyy-MM-dd' : 'yyyy-MM-dd HH:mm:ss'); // data / sygnatura czasowa
   }
@@ -35,12 +52,12 @@ function cell_(v) {
 
 /* Wiersz jako {nagłówek: wartość}. Przy powtórzonych nagłówkach (np. dwa „Link do dokumentu")
    zostaje pierwsza niepusta wartość — bazie wystarczy jedna. */
-function rowObject_(headers, values) {
+function rowObject_(headers, values, display) {
   var row = {};
   for (var i = 0; i < headers.length; i++) {
     var h = cell_(headers[i]);
     if (!h || h === STATUS_HEADER) continue;
-    var v = cell_(values[i]);
+    var v = cell_(values[i], display ? display[i] : '');
     if (row[h] === undefined || row[h] === '') row[h] = v;
   }
   return row;
@@ -98,7 +115,8 @@ function pmbOnFormSubmit(e) {
     }
   } else {
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    row = rowObject_(headers, sheet.getRange(rowIdx, 1, 1, sheet.getLastColumn()).getValues()[0]);
+    var rng = sheet.getRange(rowIdx, 1, 1, sheet.getLastColumn());
+    row = rowObject_(headers, rng.getValues()[0], rng.getDisplayValues()[0]);
   }
   sendRow_(sheet, rowIdx, row);
 }
@@ -111,11 +129,12 @@ function pmbImportSheet() {
   var col = statusCol_(sheet);
   lastCol = Math.max(lastCol, col);
   var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  var data = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  var body = sheet.getRange(2, 1, lastRow - 1, lastCol);
+  var data = body.getValues(), shown = body.getDisplayValues();
   var sent = 0, skipped = 0;
   for (var i = 0; i < data.length; i++) {
     if (cell_(data[i][col - 1]) !== '') { skipped++; continue; }
-    var row = rowObject_(headers, data[i]);
+    var row = rowObject_(headers, data[i], shown[i]);
     var any = false;
     for (var h in row) if (row[h] !== '') { any = true; break; }
     if (!any) { skipped++; continue; }
@@ -140,4 +159,44 @@ function pmbSetup() {
   }
   var k = PropertiesService.getScriptProperties().getProperty('INTAKE_KEY');
   Logger.log(k ? 'INTAKE_KEY ustawiony' : 'UWAGA: ustaw INTAKE_KEY w Ustawieniach projektu → Właściwości skryptu (klucz z panelu → Ustawienia).');
+}
+
+/* ===== Dosłanie zaległych eventów =====
+   pmbImportUpcoming(): wszystkie zakładki formularza, tylko wiersze z datą od dziś i bez wyniku w „PMB import”. */
+function pmbImportUpcoming() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var sent = 0;
+  ss.getSheets().forEach(function (sheet) {
+    var lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
+    if (lastRow < 2) return;
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(cell_);
+    if (headers.indexOf('Sygnatura czasowa') < 0) return;
+    var dateIdx = headers.indexOf('Data rozpoczęcia usługi');
+    if (dateIdx < 0) return;
+    var statusIdx = headers.indexOf(STATUS_HEADER);
+    var data = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+    for (var i = 0; i < data.length; i++) {
+      var d = data[i][dateIdx];
+      if (Object.prototype.toString.call(d) !== '[object Date]' || d < today) continue;
+      if (statusIdx >= 0 && cell_(data[i][statusIdx]) !== '') continue;
+      var col = statusCol_(sheet);
+      var hdr = sheet.getRange(1, 1, 1, Math.max(lastCol, col)).getValues()[0];
+      var rng = sheet.getRange(i + 2, 1, 1, Math.max(lastCol, col));
+      sendRow_(sheet, i + 2, pmbFixRow_(rowObject_(hdr, rng.getValues()[0], rng.getDisplayValues()[0])));
+      sent++;
+      Utilities.sleep(200);
+    }
+  });
+  Logger.log('Dosłano: ' + sent);
+}
+
+/* W starszych zakładkach link do umowy siedzi w kolumnie „Liczba gości” — przenosimy go na właściwe pole. */
+function pmbFixRow_(row) {
+  var g = String(row['Liczba gości'] || '');
+  if (/^https?:\/\//i.test(g)) {
+    if (!row['Link do dokumentu']) row['Link do dokumentu'] = g;
+    row['Liczba gości'] = '';
+  }
+  return row;
 }

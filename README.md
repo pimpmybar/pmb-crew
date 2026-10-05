@@ -61,6 +61,8 @@ Skrypt arkusza wysyła każdy wiersz do bazy (`event_intake`), a event pojawia s
    i zatwierdź uprawnienia (zakłada wyzwalacz „przy przesłaniu formularza").
 3. Zaległe wiersze (opcjonalnie): otwórz zakładkę w arkuszu i uruchom `pmbImportSheet()` — wyśle wiersze bez wpisu w kolumnie
    `PMB import`. Kolumna ta (dopisywana na końcu nagłówków) trzyma wynik: `created|exists|linked <id>` albo treść błędu.
+   Wszystkie zakładki naraz, tylko eventy z datą od dziś: `pmbImportUpcoming()` (przenosi też link do umowy wpisany
+   w kolumnie „Liczba gości” na właściwe pole — `pmbFixRow_`).
 
 Duplikaty: `intake_id` = `sygnatura czasowa|adres e-mail` z unikalnym indeksem per organizacja. Ponowne wysłanie tego samego
 wiersza zwraca `exists` i niczego nie zmienia (uzupełni tylko pusty link do umowy). Jeśli event był już wpisany ręcznie —
