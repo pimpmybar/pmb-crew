@@ -83,6 +83,19 @@ async function uploadPhoto(item, file){
 }
 let toastT; function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),1400); }
 let ITEMS=[];
+// ?ev=<id eventu> — remanent tylko z pozycji z listy pakowania tego eventu (update33)
+const evOnly=new URLSearchParams(location.search).get('ev');
+async function loadItems(){
+  const all=await rpc('stock_list',{p_key:key});
+  if(!evOnly) return all;
+  try{
+    const r=await rpc('stock_event_ids',{p_key:key,p_event:evOnly}); if(!r) return all;
+    const ids=new Set(r.ids||[]); let n=document.getElementById('evNote');
+    if(!n){ n=document.createElement('p'); n.id='evNote'; n.className='note'; $('list').parentNode.insertBefore(n,$('list')); }
+    n.innerHTML='Tylko pozycje z eventu: <b>'+esc(r.name)+'</b> ('+ids.size+'). <a href="'+location.pathname+'?k='+encodeURIComponent(key)+'">Pokaż cały magazyn</a>';
+    return all.filter(i=>ids.has(i.id));
+  }catch(e){ return all; }
+}
 try{ $('who').value=localStorage.getItem('pmb_stock_who')||''; }catch(e){}
 $('who').onchange=()=>{ try{ localStorage.setItem('pmb_stock_who',$('who').value.trim()); }catch(e){} };
 function render(){
@@ -118,7 +131,7 @@ $('list').addEventListener('change', async ev=>{
 $('n_add').onclick=async()=>{
   const name=$('n_name').value.trim(); if(!name){ alert('Podaj nazwę pozycji.'); return; }
   try{ await rpc('stock_add',{p_key:key,p_category:$('n_cat').value.trim()||'INNE',p_name:name,p_unit:$('n_unit').value.trim()||'szt.',p_stock:$('n_stock').value===''?null:Number($('n_stock').value),p_by:$('who').value.trim()});
-    ITEMS=await rpc('stock_list',{p_key:key}); $('catList').innerHTML=[...new Set(ITEMS.map(i=>i.category))].map(c=>`<option value="${esc(c)}">`).join(''); render(); renderCatChips();
+    ITEMS=await loadItems(); $('catList').innerHTML=[...new Set(ITEMS.map(i=>i.category))].map(c=>`<option value="${esc(c)}">`).join(''); render(); renderCatChips();
     $('n_name').value=''; $('n_stock').value=''; toast('Dodano: '+name); $('n_name').focus(); }
   catch(e){ alert('Nie udało się dodać pozycji.'); }
 };
@@ -130,7 +143,7 @@ $('snap').onclick=async()=>{
 };
 (async()=>{
   if(!key){ $('loading').classList.add('hidden'); $('invalid').classList.remove('hidden'); return; }
-  try{ ITEMS=await rpc('stock_list',{p_key:key}); }catch(e){ $('loading').classList.add('hidden'); $('invalid').classList.remove('hidden'); return; }
+  try{ ITEMS=await loadItems(); }catch(e){ $('loading').classList.add('hidden'); $('invalid').classList.remove('hidden'); return; }
   $('loading').classList.add('hidden'); $('app').classList.remove('hidden'); $('bar').classList.remove('hidden'); $('catList').innerHTML=[...new Set(ITEMS.map(i=>i.category))].map(c=>`<option value="${esc(c)}">`).join(''); render(); renderCatChips();
 })();
 </script>
