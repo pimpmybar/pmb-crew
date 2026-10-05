@@ -32,6 +32,7 @@ svg.corner{position:absolute;width:50px;height:50px;opacity:.5}
   <b>MENU DO DRUKU</b><span class="muted" id="evInfo">…</span>
   <span id="drinkToggles" style="display:flex;gap:10px;flex-wrap:wrap"></span>
   <span style="flex:1"></span>
+  <a class="btn" id="coffeePdf" href="menu-druk/coffee-menu-A4.pdf" target="_blank" style="display:none;text-decoration:none">☕ Coffee menu (PDF)</a>
   <button class="btn primary" onclick="window.print()">🖨 Drukuj / PDF</button>
 </div>
 <div class="wrap"><div class="page" id="pg"><p style="padding:40px;color:#888;font-family:Inter,sans-serif" id="loading">Ładuję…</p></div></div>
@@ -236,6 +237,10 @@ function toggles(){
     } else { $('loading').textContent='Brak parametru — otwórz z panelu lub z linku barmana.'; return; }
     $('evInfo').textContent=label;
     DRINKS=parseMenu(menuTxt).map(d=>({...d,on:true}));
+    // standardowe menu kawowe ma własny, gotowy projekt A4 — drukujemy PDF, a nie składamy z tekstu
+    const hasCoffee=/^\s*coffee\s+menu/im.test(menuTxt);
+    if(hasCoffee) $('coffeePdf').style.display='';
+    if(!DRINKS.length&&hasCoffee){ location.replace('menu-druk/coffee-menu-A4.pdf'); return; }
     if(!DRINKS.length){ $('loading').textContent='Nie rozpoznałem koktajli w menu tego eventu — uzupełnij pole Menu w panelu.'; toggles(); return; }
     toggles(); render();
   }catch(err){ $('loading').textContent='Błąd: '+err.message; }
