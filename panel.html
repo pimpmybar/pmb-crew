@@ -133,7 +133,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
               <div class="grid g4">
                 <div><label>Telefon (WhatsApp)</label><input id="a_phone" placeholder="+48 600 000 000" list="phoneList"><datalist id="phoneList"></datalist></div>
                 <div><label>Imię (jeśli znasz)</label><input id="a_first"></div>
-                <div><label>Rola</label><select id="a_role"><option value="barman">Barman</option><option value="pomocnik">Pomocnik</option></select></div>
+                <div><label>Rola</label><select id="a_role"><option value="barman">Barman</option><option value="barista">Barista</option><option value="pomocnik">Pomoc</option><option value="kelner">Kelner</option></select></div>
                 <div><label>Stawka</label><div style="display:flex;gap:6px"><input id="a_rate" type="number" inputmode="numeric" placeholder="zł"><select id="a_unit" style="width:110px"><option value="event">/ event</option><option value="godzina">/ godz.</option></select></div></div>
               </div>
               <label>Dopisek do stawki (np. netto, umowa zlecenie, płatne do 7 dni)</label><input id="a_note" placeholder="netto, umowa zlecenie">
@@ -329,7 +329,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
           <div><label>Imię</label><input id="pe_first"></div><div><label>Nazwisko</label><input id="pe_last"></div>
           <div><label>Telefon</label><input id="pe_phone"></div><div><label>E-mail</label><input id="pe_email"></div>
           <div><label>Miasto</label><input id="pe_city"></div><div><label>Rozmiar</label><input id="pe_size"></div>
-          <div><label>Domyślna rola</label><select id="pe_role"><option value="barman">Barman</option><option value="pomocnik">Pomocnik</option></select></div>
+          <div><label>Domyślna rola</label><select id="pe_role"><option value="barman">Barman</option><option value="barista">Barista</option><option value="pomocnik">Pomoc</option><option value="kelner">Kelner</option></select></div>
           <div><label>Ocena (1–5)</label><input id="pe_rating" type="number" min="1" max="5"></div>
           <div><label>Status</label><select id="pe_status"><option value="nowy">nowy</option><option value="aktywny">aktywny</option><option value="rezerwa">rezerwa</option><option value="nieaktywny">nieaktywny</option></select></div>
           <div><label>Warunki zaakceptowane</label><input id="pe_terms" disabled></div>
@@ -615,13 +615,15 @@ function renderEvList(){
   $('evList').innerHTML = events.map(e=>`<div class="evitem ${cur&&cur.id===e.id?'on':''}" data-id="${e.id}"><b>${esc(e.name)}</b><small>${e.event_date}${endOf(e)!==e.event_date?' → '+endOf(e).slice(5):''} · <span class="pill ${STATUS[e.status]?.[1]||''}">${STATUS[e.status]?.[0]||e.status}</span> ${pctPill(e)}${carsOf(e).length?' · '+carsOf(e).join('+'):''}${carConflicts(e).length?' <span class="pill bad">kolizja auta</span>':''}${GLASS_TODO.has(e.id)?' <span class="pill warn">szkło do rozliczenia</span>':''}${GLASS_NORET.has(e.id)?' <span class="pill bad">szkło bez zwrotu</span>':''}${e.intake_id&&e.status==='wstepny'?' <span class="pill warn">z formularza</span>':''}</small></div>`).join('') || '<div class="muted">Brak eventów</div>';
   document.querySelectorAll('.evitem').forEach(el=>el.onclick=()=>openEvent(el.dataset.id));
 }
+// role: barman i barista liczą się do „barmanów”, pomoc i kelner do „pomocników”
+const ROLE_PL={barman:'barman',barista:'barista',pomocnik:'pomoc',kelner:'kelner'}, isHelp=r=>r==='pomocnik'||r==='kelner';
 async function loadEvents(){
   events = await api('GET','events?select=*&order=event_date.desc');
   { // najbliższe na górze (rosnąco), minione pod spodem (od najświeższych)
     const td=new Date().toLocaleDateString('sv-SE'), end=e=>e.event_end_date||e.event_date||'';
     events.sort((x,y)=>{ const fx=end(x)>=td, fy=end(y)>=td; if(fx!==fy) return fx?-1:1; const c=(x.event_date||'').localeCompare(y.event_date||''); return fx?c:-c; });
   }
-  try{ const acc=await api('GET','assignments?select=event_id,role&status=eq.zaakceptowany'); ACC={}; acc.forEach(a=>{ const o=ACC[a.event_id]=ACC[a.event_id]||{b:0,p:0}; if(a.role==='pomocnik') o.p++; else o.b++; }); }catch(e){}
+  try{ const acc=await api('GET','assignments?select=event_id,role&status=eq.zaakceptowany'); ACC={}; acc.forEach(a=>{ const o=ACC[a.event_id]=ACC[a.event_id]||{b:0,p:0}; if(isHelp(a.role)) o.p++; else o.b++; }); }catch(e){}
   // jedno zapytanie na obie plakietki: szkło do rozliczenia (zwrot bez settled_at) i szkło bez zwrotu (event po terminie)
   try{
     const gp=await apiGet('glass_protocols?kind=in.(wydanie,zwrot)&voided_at=is.null&select=event_id,kind,settled_at');
@@ -708,16 +710,16 @@ const ASG = {wyslany:['Wysłany',''],otwarty:['Otworzył, nie odpowiedział','wa
 function linkFor(a){ return `${crewUrl()}?t=${a.token}`; }
 function waMsg(a){
   const c=a.crew||{}; const hi = c.first_name?`Cześć ${c.first_name}!`:'Cześć!';
-  return `${hi} Tu Tomek z Pimp My Bar. ${cur.name} — ${cur.event_date}, ${cur.start_time||''}–${cur.end_time||''}. Rola: ${a.role}, stawka ${money(a.rate_amount)}${a.rate_unit==='godzina'?'/h':''}${a.rate_note?' ('+a.rate_note+')':''}. Szczegóły i potwierdzenie pod Twoim linkiem: ${linkFor(a)}`;
+  return `${hi} Tu Tomek z Pimp My Bar. ${cur.name} — ${cur.event_date}, ${cur.start_time||''}–${cur.end_time||''}. Rola: ${ROLE_PL[a.role]||a.role}, stawka ${money(a.rate_amount)}${a.rate_unit==='godzina'?'/h':''}${a.rate_note?' ('+a.rate_note+')':''}. Szczegóły i potwierdzenie pod Twoim linkiem: ${linkFor(a)}`;
 }
 async function loadAsgs(){
   asgs = await api('GET',`assignments?select=*,crew(*)&event_id=eq.${cur.id}&order=created_at`);
   const acc=asgs.filter(a=>a.status==='zaakceptowany');
-  ACC[cur.id]={b:acc.filter(a=>a.role!=='pomocnik').length,p:acc.filter(a=>a.role==='pomocnik').length}; renderChk(); renderEvList();
-  $('stat').innerHTML = `<div><b>${acc.filter(a=>a.role==='barman').length}/${cur.bartenders_needed||0}</b>barmanów</div><div><b>${acc.filter(a=>a.role==='pomocnik').length}/${cur.helpers_needed||0}</b>pomocników</div><div><b>${asgs.filter(a=>a.status==='wyslany').length}</b>nie otworzyło</div><div><b>${asgs.filter(a=>a.status==='otwarty').length}</b>bez odpowiedzi</div><div><b>${asgs.filter(a=>a.status==='odrzucony').length}</b>odrzuciło</div>`;
+  ACC[cur.id]={b:acc.filter(a=>!isHelp(a.role)).length,p:acc.filter(a=>isHelp(a.role)).length}; renderChk(); renderEvList();
+  $('stat').innerHTML = `<div><b>${acc.filter(a=>!isHelp(a.role)).length}/${cur.bartenders_needed||0}</b>barmanów / baristów</div><div><b>${acc.filter(a=>isHelp(a.role)).length}/${cur.helpers_needed||0}</b>pomoc / kelnerzy</div><div><b>${asgs.filter(a=>a.status==='wyslany').length}</b>nie otworzyło</div><div><b>${asgs.filter(a=>a.status==='otwarty').length}</b>bez odpowiedzi</div><div><b>${asgs.filter(a=>a.status==='odrzucony').length}</b>odrzuciło</div>`;
   $('asgBody').innerHTML = asgs.map(a=>{const c=a.crew||{}; const s=ASG[a.status]||[a.status,''];
     return `<tr><td><b>${esc([c.first_name,c.last_name].filter(Boolean).join(' ')||'(bez imienia)')}</b><br><span class="muted mono">${esc(c.phone)}</span></td>
-    <td>${a.role}</td><td>${money(a.rate_amount)}${a.rate_unit==='godzina'?'/h':''}<br><span class="muted">${esc(a.rate_note||'')}</span></td>
+    <td>${ROLE_PL[a.role]||a.role}</td><td>${money(a.rate_amount)}${a.rate_unit==='godzina'?'/h':''}<br><span class="muted">${esc(a.rate_note||'')}</span></td>
     <td><span class="pill ${s[1]}">${s[0]}</span>${a.counter_offer?`<br><span class="muted">chce: ${esc(a.counter_offer)}</span>`:''}${a.status==='zaakceptowany'&&cur.agenda_published&&(a.seen_agenda_version||0)<(cur.agenda_version||0)?'<br><span class="pill info">nie widział agendy</span>':''}</td>
     <td><button class="btn sm" data-copy="${a.id}">Kopiuj link</button> <a class="btn sm" target="_blank" href="https://wa.me/${esc((c.phone||'').replace(/\D/g,''))}?text=${encodeURIComponent(waMsg(a))}">WA</a></td>
     <td class="right"><button class="btn sm" data-rate="${a.id}">Stawka</button> <button class="btn sm danger" data-del="${a.id}">✕</button></td></tr>`;}).join('') || '<tr><td colspan="6" class="muted">Nikogo jeszcze nie dodałeś.</td></tr>';

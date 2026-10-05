@@ -363,7 +363,7 @@ function render(){
   $('evTravelRow').classList.toggle('hidden', !e.travel_note); $('evTravel').textContent = e.travel_note||'';
   $('evPay').textContent = e.payment_info||'';
   $('evScale').textContent = [e.guests?`~${e.guests} gości`:null, e.bartenders_needed?`${e.bartenders_needed} barmanów`:null, e.helpers_needed?`${e.helpers_needed} pomocników`:null].filter(Boolean).join(' · ');
-  $('evRole').textContent = a.role==='pomocnik'?'Pomocnik barmana':'Barman';
+  $('evRole').textContent = ({barman:'Barman',barista:'Barista',pomocnik:'Pomoc barmana',kelner:'Kelner'})[a.role]||'Barman';
   $('evRate').textContent = money(a.rate_amount);
   $('evRateUnit').textContent = a.rate_amount==null?'':(a.rate_unit==='godzina'?'/ godzina':'/ event');
   $('evRateNote').textContent = a.rate_note||'';
@@ -384,7 +384,7 @@ function render(){
   if(a.status==='zaakceptowany'){
     pill.textContent='W składzie'; pill.className='pill ok';
     $('accepted').classList.remove('hidden');
-    $('accText').textContent = `${c.first_name||''}, widzimy się ${fmtDate(e.event_date)}. Rola: ${a.role==='pomocnik'?'pomocnik':'barman'}, stawka ${money(a.rate_amount)}${a.rate_unit==='godzina'?'/h':''}.`;
+    $('accText').textContent = `${c.first_name||''}, widzimy się ${fmtDate(e.event_date)}. Rola: ${({barista:'barista',pomocnik:'pomoc',kelner:'kelner'})[a.role]||'barman'}, stawka ${money(a.rate_amount)}${a.rate_unit==='godzina'?'/h':''}.`;
     if(ag){
       $('agendaWait').classList.add('hidden'); $('agenda').classList.remove('hidden');
       $('agMeeting').innerHTML = `<b>${esc(ag.meeting_time||'godzina do potwierdzenia')}</b><br>${esc(ag.meeting_place||'')}`;
