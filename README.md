@@ -70,6 +70,11 @@ ta sama data i ten sam klient — wiersz się do niego **podpina** (`linked`): d
 a pozostałe pola zostają nietknięte. Nagłówki czytane są tolerancyjnie (po początku, bez względu na wielkość liter i spacje),
 daty w formatach `YYYY-MM-DD`, `DD.MM.YYYY`, `DD/MM/YYYY`, godziny sprowadzane do `HH:MM`.
 
+## Ukrywanie eventów i okno magazynu (od update31)
+- `events.crew_hidden` — w panelu, w edycji eventu: „Ukryj przed ekipą (nie pokazuj w magazynie)”. Ukryty event nie pojawia się na liście magazynowej ekipy; osoba zaproszona do eventu nadal widzi swoje zaproszenie.
+- Lista magazynowa (`wh_events`) pokazuje tylko bieżący miesiąc i dwa następne.
+- Kolejność wdrożenia: najpierw `update31.sql` w Supabase, potem `panel.html`. Cofnięcie: `update31_rollback.sql`.
+
 ## Kopia repo
 Sesje Claude nie trzymają plików między uruchomieniami. Po każdej sesji zapisz `pmb-crew.bundle`
 (`git bundle create pmb-crew.bundle --all`) i wgraj zmiany na GitHub. Odtworzenie: `git clone pmb-crew.bundle pmb-crew`.

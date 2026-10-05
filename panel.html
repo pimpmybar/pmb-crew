@@ -305,6 +305,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
                 <div><label>Dopisek do stawki</label><input id="e_drn" placeholder="netto, umowa zlecenie"></div>
               </div>
               <div class="check"><input type="checkbox" id="e_open"><label style="margin:0">Zapisy przez link grupowy otwarte</label></div>
+              <div class="check"><input type="checkbox" id="e_hidden"><label style="margin:0">Ukryj przed ekipą (nie pokazuj w magazynie)</label></div>
               <div class="card" style="margin:10px 0 0;background:var(--card2)">
                 <div class="mono" id="e_invite" style="word-break:break-all"></div>
                 <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn sm" id="e_invCopy">Kopiuj link</button><button class="btn sm" id="e_invMsg">Kopiuj wiadomość na grupę</button></div>
@@ -636,7 +637,7 @@ async function openEvent(id){
   $('e_name').value=cur.name||''; $('e_client').value=cur.client||''; $('e_date').value=cur.event_date||''; $('e_end_date').value=cur.event_end_date||''; $('e_start').value=cur.start_time||''; $('e_end').value=cur.end_time||'';
   $('e_status').value=cur.status; $('e_venue').value=cur.venue||''; $('e_address').value=cur.address||''; $('e_map').value=cur.map_url||'';
   $('e_vurl').value=cur.venue_url||''; $('e_pay').value=cur.payment_info||''; $('e_travel').value=cur.travel_note||'';
-  $('e_drb').value=cur.default_rate_bartender??''; $('e_drh').value=cur.default_rate_helper??''; $('e_drn').value=cur.default_rate_note||''; $('e_open').checked=cur.invite_open!==false;
+  $('e_drb').value=cur.default_rate_bartender??''; $('e_drh').value=cur.default_rate_helper??''; $('e_drn').value=cur.default_rate_note||''; $('e_open').checked=cur.invite_open!==false; $('e_hidden').checked=!!cur.crew_hidden;
   const inv = cur.invite_code ? `${crewUrl()}?e=${cur.invite_code}` : '(zapisz event, żeby wygenerować)';
   $('e_invite').textContent=inv;
   $('e_invCopy').onclick=()=>{ navigator.clipboard.writeText(inv); toast('Link skopiowany'); };
@@ -666,7 +667,7 @@ $('newEvent').onclick = async()=>{
 $('e_save').onclick = async()=>{
   const n = v => v===''?null:Number(v);
   const body={name:$('e_name').value,client:$('e_client').value,event_date:$('e_date').value,event_end_date:$('e_end_date').value||null,start_time:$('e_start').value,end_time:$('e_end').value,status:$('e_status').value,
-    venue:$('e_venue').value,address:$('e_address').value,map_url:$('e_map').value,venue_url:$('e_vurl').value,payment_info:$('e_pay').value,travel_note:$('e_travel').value,default_rate_bartender:n($('e_drb').value),default_rate_helper:n($('e_drh').value),default_rate_note:$('e_drn').value,invite_open:$('e_open').checked,guests:n($('e_guests').value),bartenders_needed:n($('e_bart').value),helpers_needed:n($('e_help').value),summary:$('e_summary').value};
+    venue:$('e_venue').value,address:$('e_address').value,map_url:$('e_map').value,venue_url:$('e_vurl').value,payment_info:$('e_pay').value,travel_note:$('e_travel').value,default_rate_bartender:n($('e_drb').value),default_rate_helper:n($('e_drh').value),default_rate_note:$('e_drn').value,invite_open:$('e_open').checked,crew_hidden:$('e_hidden').checked,guests:n($('e_guests').value),bartenders_needed:n($('e_bart').value),helpers_needed:n($('e_help').value),summary:$('e_summary').value};
   if('glass_price' in cur) body.glass_price=n($('e_glass_price').value);   // kolumna dopiero od update29
   await api('PATCH',`events?id=eq.${cur.id}`,body); toast('Zapisano'); await loadEvents(); openEvent(cur.id);
 };
