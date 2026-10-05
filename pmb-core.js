@@ -42,7 +42,7 @@ async function rpc(fn, args){
 /* ---------- ORGANIZACJA, MOTYW, MARKA ---------- */
 function orgSlug(){ return new URLSearchParams(location.search).get('o') || DEFAULT_ORG_SLUG; }
 function initTheme(btnId){
-  if(localStorage.getItem('pmb_theme') === 'light') document.documentElement.classList.add('light');
+  if(localStorage.getItem('pmb_theme') !== 'dark') document.documentElement.classList.add('light');   // jasny domyślnie
   const b = btnId && $(btnId); if(b) b.onclick = () => { const l = document.documentElement.classList.toggle('light'); localStorage.setItem('pmb_theme', l ? 'light' : 'dark'); };
 }
 function applyBrand(brand){

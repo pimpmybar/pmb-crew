@@ -617,6 +617,10 @@ function renderEvList(){
 }
 async function loadEvents(){
   events = await api('GET','events?select=*&order=event_date.desc');
+  { // najbliższe na górze (rosnąco), minione pod spodem (od najświeższych)
+    const td=new Date().toLocaleDateString('sv-SE'), end=e=>e.event_end_date||e.event_date||'';
+    events.sort((x,y)=>{ const fx=end(x)>=td, fy=end(y)>=td; if(fx!==fy) return fx?-1:1; const c=(x.event_date||'').localeCompare(y.event_date||''); return fx?c:-c; });
+  }
   try{ const acc=await api('GET','assignments?select=event_id,role&status=eq.zaakceptowany'); ACC={}; acc.forEach(a=>{ const o=ACC[a.event_id]=ACC[a.event_id]||{b:0,p:0}; if(a.role==='pomocnik') o.p++; else o.b++; }); }catch(e){}
   // jedno zapytanie na obie plakietki: szkło do rozliczenia (zwrot bez settled_at) i szkło bez zwrotu (event po terminie)
   try{
