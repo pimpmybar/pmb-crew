@@ -130,9 +130,12 @@ function normHead(line){
 function parseMenu(txt){
   const found=[], seen=new Set();
   const add=(d,mock)=>{ mock=!!mock; const k=norm(d.name)+'|'+(mock?1:0); if(seen.has(k))return; seen.add(k); found.push({...d, mock}); };
+  let offCard=false;   // sekcje spoza karty koktajli: „COFFEE MENU …” i „POZA KARTĄ” — pomijane aż do nagłówka „KOKTAJLE …”
   let zeroSection=false;   // pod nagłówkiem „KOKTAJLE BEZALKOHOLOWE / ZERO / 0%” pozycje są bez alkoholu, nawet bez słowa „zero” w nazwie
   (txt||'').split(/\n+/).forEach(line=>{
     const t=String(line||'').trim().replace(MARK,'').trim();
+    if(/^(coffee\s+menu|poza\s+kart[ąa])/i.test(t)){ offCard=true; return; }
+    if(offCard){ if(/^(koktajle|drinki)\b/i.test(t)) offCard=false; else return; }
     if(/^(koktajle|drinki|menu|napoje|wersje|\d+\.)\s*[\wąćęłńóśźż ]*?(bezalk|\bzero\b|0\s*%|virgin|non.?alco)/i.test(t)||/^(bezalkoholowe|bezalko|zero|0\s*%)\s*[:—–-]?\s*$/i.test(t)){ zeroSection=true; return; }
     if(zeroSection&&/(^koktajle\s+alkoholowe|^\d+\.\s|^szkło|^szklo|^razem|^transfer|^obsług|^obslug|^alkohole\b)/i.test(t)) zeroSection=false;
     const h=normHead(line); if(!h) return;
