@@ -153,17 +153,23 @@ function parseMenu(txt){
         const base=zeroBase(nm); if(!base) return;
         const hit=IDX[norm('virgin '+base)]||IDX[norm(base+' virgin')]||IDX[norm(base+' zero')]||IDX[norm(base)];
         const nazwa=h.disp||titleIfCaps(base)+' Zero';
-        if(hit) add({...hit, name:nazwa, ing: hit.mock?hit.ing:stripAlco(hit.ing)}, true);
-        else if(/^[\p{Lu}]/u.test(base)&&!/\d/.test(base)&&base.length>=3) add({name:nazwa,ing:'',desc:''}, true);
+        if(hit) add({...hit, name:nazwa, ing: hit.mock?hit.ing:stripAlco(hit.ing), _base:base, _disp:!!h.disp}, true);
+        else if(/^[\p{Lu}]/u.test(base)&&!/\d/.test(base)&&base.length>=3) add({name:nazwa,ing:'',desc:'',_base:base,_disp:!!h.disp}, true);
       } else {
         const bare=nm.replace(/\s*\([^)]*\)\s*/g,' ').trim();   // nazwa bez nawiasu do dopasowania receptury
         const hit=IDX[norm(nm)]||IDX[norm(bare)];
-        if(hit) add({...hit, name: h.disp||(bare===nm?hit.name:nm)}, hit.mock);
-        else if(/^[\p{Lu}]/u.test(nm)&&!/\d/.test(nm)&&nm.length>=4) add({name:h.disp||nm,ing:'',desc:''}, false);
+        if(hit) add({...hit, name: h.disp||(bare===nm?hit.name:nm), _base:hit.name}, hit.mock);
+        else if(/^[\p{Lu}]/u.test(nm)&&!/\d/.test(nm)&&nm.length>=4) add({name:h.disp||nm,ing:'',desc:'',_base:nm}, false);
       }
     });
   });
-  return found;
+  // wersja 0% koktajlu, który jest też na karcie z alkoholem → nie osobna pozycja, tylko dopisek „dostępny również w wersji 0%”
+  const alco=new Map(found.filter(d=>!d.mock).map(d=>[norm(d._base||d.name),d]));
+  return found.filter(d=>{
+    if(!d.mock||d._disp) return true;
+    const a=alco.get(norm(d._base||'')); if(!a) return true;
+    a.zeroToo=true; return false;
+  });
 }
 
 /* ===== SZABLON: VINTAGE SPEAKEASY — CZARNO-BIAŁE (MONO) ===== */
@@ -184,11 +190,13 @@ function render(){
   const n=items.length, dense=n>10;
   const nameSize=dense?'12px':'15.5px', ingSize=dense?'8px':'8.5px', descSize=dense?'9px':'9.5px', itemPad=dense?'6px':'11px', titleSize=dense?'30px':'36px';
   const item=d=>{
+    const zt=d.zeroToo?`<div style="font-size:${ingSize};letter-spacing:.07em;text-transform:uppercase;color:${S.ing};font-family:${S.bodyFont};margin-top:3px;">Dostępny również w wersji 0%</div>`:'';
     const mock=d.mock?`<span style="display:inline-block;font-size:7.5px;background:#000;color:#fff;padding:1px 5px;border-radius:3px;margin-left:5px;vertical-align:2px;font-style:normal;letter-spacing:.06em;font-weight:600;font-family:Arial,sans-serif;">0%</span>`:'';
     return `<div style="padding:${itemPad} 0;border-bottom:.5px solid ${S.line};">
       <div style="font-size:${nameSize};font-weight:600;text-transform:uppercase;letter-spacing:.08em;font-family:${S.titleFont};color:${S.text};margin-bottom:3px;">${esc(d.name)}${mock}</div>
       ${d.ing?`<div style="font-size:${ingSize};text-transform:uppercase;letter-spacing:.07em;color:${S.ing};font-family:${S.bodyFont};margin-bottom:3px;">${esc(d.ing)}</div>`:''}
       ${d.desc?`<div style="font-size:${descSize};color:${S.desc};font-family:${S.bodyFont};font-style:italic;line-height:1.5;">${esc(d.desc)}</div>`:''}
+      ${zt}
     </div>`; };
   $('pg').innerHTML=`
     ${cornerSVG('tl')}${cornerSVG('tr')}${cornerSVG('bl')}${cornerSVG('br')}
