@@ -89,7 +89,10 @@ async function loadItems(){
   const all=await rpc('stock_list',{p_key:key});
   if(!evOnly) return all;
   try{
-    const r=await rpc('stock_event_ids',{p_key:key,p_event:evOnly}); if(!r) return all;
+    // ?ev=id1,id2 — kilka eventów naraz
+    const rs=(await Promise.all(evOnly.split(',').map(x=>x.trim()).filter(Boolean).map(x=>rpc('stock_event_ids',{p_key:key,p_event:x})))).filter(Boolean);
+    if(!rs.length) return all;
+    const r={name:rs.map(x=>x.name).join(' + '), ids:[].concat(...rs.map(x=>x.ids||[]))};
     const ids=new Set(r.ids||[]); let n=document.getElementById('evNote');
     if(!n){ n=document.createElement('p'); n.id='evNote'; n.className='note'; $('list').parentNode.insertBefore(n,$('list')); }
     n.innerHTML='Tylko pozycje z eventu: <b>'+esc(r.name)+'</b> ('+ids.size+'). <a href="'+location.pathname+'?k='+encodeURIComponent(key)+'">Pokaż cały magazyn</a>';
